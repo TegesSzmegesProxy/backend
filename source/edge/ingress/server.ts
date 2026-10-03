@@ -16,6 +16,12 @@ import { AdaptiveControl } from "@tessera/feedback";
 import SqlInjection from "@tessera/core/static-analysis/tools/injection/sqlinjection";
 import CommandInjection from "@tessera/core/static-analysis/tools/injection/commandinjection";
 import Xss from "@tessera/core/static-analysis/tools/injection/xss";
+import { TenantRedis } from '@tessera/shared/storage';
+import { requestsCacheSize } from '@tessera/shared/config';
+import type { NormalizedRequest } from '@tessera/shared/contracts';
+
+const REQUESTS_CACHE_TTL_SECONDS = 60 * 60;
+
 type Env = {
   REDIS_URL: string;
   PORT: string;
@@ -28,12 +34,16 @@ class IngressServer {
   private broker: Broker | undefined;
   private runner =  new Runner()
   private aggregator = new Aggregator()
-  constructor(private readonly normalizer: Normalizer = new Normalizer()) {}
+  private requestRedis: TenantRedis;
+  private readonly requestsCacheSize = requestsCacheSize();
+  constructor(private readonly redis: TenantRedis, private readonly normalizer: Normalizer = new Normalizer()) {
+    this.requestRedis = redis.sub('ingress-requests-cache');
+  }
   // Placeholder values until per-tenant runtime config arrives with the policy bundle (TODO T04/T20/T31/T35).
   // N is a probability (0-1); thresholds are on the JEV attack probability (0-1) and tighten toward the floor under attack.
   private orchestrator = new DecisionOrchestrator(
     {
-      jev: new JevClient(new TypeSafeClient({})),
+      jev: new JevClient(new TypeSafeClient({}), this.redis),
       adaptive: new AdaptiveControl(),
       sampler: new Sampler(),
       configFor: () => ({
@@ -79,6 +89,7 @@ class IngressServer {
       url: "/*",
       handler: async (request, reply) => {
         const normalized = this.normalizer.normalize(request, tenantId); 
+        this.cacheRequest(normalized);
         const toolResult =  this.runner.run(normalized, [{tool: new Xss(), target: "login"}, {tool: new SqlInjection(), target: "login"}] )
         let staticResult = this.aggregator.aggregate(toolResult)
         const decision = await this.orchestrator.orchestrate(normalized, staticResult)
@@ -90,6 +101,14 @@ class IngressServer {
       },
         
     });
+  }
+
+  // Fire-and-forget: Redis is non-authoritative, so a failed write must not delay or fail the request.
+  private cacheRequest(request: NormalizedRequest): void {
+    if (this.requestsCacheSize === 0) return;
+    this.requestRedis
+      .pushRecent(request.clientIp, JSON.stringify(request), this.requestsCacheSize, REQUESTS_CACHE_TTL_SECONDS)
+      .catch((error) => console.warn("[ingress] failed to cache request:", error));
   }
 
   async stop(): Promise<void> {

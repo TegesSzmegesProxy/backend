@@ -3,6 +3,8 @@ import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { encode } from '@toon-format/toon';
 import { StaticVerdict } from '../static-analysis/aggregator';
 import { JEV_ATTACK_QUESTION, JEV_SEVERITY_QUESTION } from './prompt';
+import { TenantRedis } from '@tessera/shared/storage';
+import { Normalizer } from '@tessera/edge/normalizer';
 
 export interface DynamicVerdict {
     /** Expected severity level (0 benign to 3 critical); for display, not enforcement. */
@@ -28,9 +30,44 @@ interface JevState {
 const PATTERN_MATCH_NOTE = 'Keyword/regex pre-filter. Matches are frequent on ordinary text and are not findings.';
 
 export class JevClient {
-    constructor(private readonly model: JevModel) {}
+    private redis: TenantRedis;
+    
+    constructor(private readonly model: JevModel, redis: TenantRedis) {
+        this.redis = redis.sub('jev-verdict-cache');
+    }
+
+    private getRequestKey(request: NormalizedRequest) {
+        return `${request.endpoint}:${Normalizer.hashRequestBody(request.body)}`;
+    }
+
+    private storeVerdict(request: NormalizedRequest, verdict: DynamicVerdict) {
+        this.redis.set(this.getRequestKey(request), JSON.stringify(verdict), 60 * 60 * 24);
+    }
+
+    private async checkVerdict(request: NormalizedRequest): Promise<DynamicVerdict | undefined> {
+        const verdict = await this.redis.get(this.getRequestKey(request));
+        if (verdict === null) return undefined;
+
+        const json = JSON.parse(verdict);
+        const score = json['score'];
+        const attackProbability = json['attackProbability'];
+        const confidence = json['confidence'];
+
+        if (score === undefined || attackProbability === undefined || confidence === undefined) return;
+        if (typeof score !== 'number' || typeof attackProbability !== 'number' || typeof confidence !== 'number') return;
+        if (isNaN(score) || isNaN(attackProbability) || isNaN(confidence)) return;
+
+        return {
+            score,
+            attackProbability,
+            confidence,
+        };
+    }
 
     async createVerdict(request: NormalizedRequest, staticAnalysis: StaticVerdict): Promise<DynamicVerdict> {
+        const previousVerdict = await this.checkVerdict(request);
+        if (previousVerdict !== undefined) return previousVerdict;
+        
         const response = await this.model.systemOne({
             state: encode(this.buildState(request, staticAnalysis)),
             questions: {
@@ -43,12 +80,16 @@ export class JevClient {
         if (!Number.isFinite(attackProbability) || attackProbability < 0 || attackProbability > 1) {
             throw new RangeError(`JEV attack probability ${attackProbability} is not between 0 and 1`);
         }
-        console.log(response, attackProbability, response.answers.attack.noul)
-        return {
+
+        const verdict = {
             score: response.answers.severity.score,
             attackProbability,
             confidence: Math.abs(2 * attackProbability - 1),
         };
+
+        this.storeVerdict(request, verdict);
+
+        return verdict;
     }
 
     private buildState(request: NormalizedRequest, staticAnalysis: StaticVerdict): JevState {

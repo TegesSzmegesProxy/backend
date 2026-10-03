@@ -1,7 +1,7 @@
 import { IngressServer } from "./edge";
 import { Broker } from "./shared/broker";
 import { MongoStorage, RedisStorage } from "./shared/storage";
-import { tenantsDbName } from "./shared/config";
+import { tenantId, tenantsDbName } from "./shared/config";
 
 const REDIS_STARTUP_TIMEOUT_MS = 5_000;
 
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
     connectOptional("broker", () => broker.connect()),
   ]);
 
-  const ingress = new IngressServer();
+  const ingress = new IngressServer(redis.tenant(tenantId()));
   await ingress.start();
 
   const shutdown = async (): Promise<void> => {

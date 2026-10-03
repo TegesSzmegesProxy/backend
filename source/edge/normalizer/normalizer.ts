@@ -8,8 +8,8 @@ class Normalizer {
     normalize(request: FastifyRequest, tenantId: string): NormalizedRequest {
         // A bodiless request yields no body fields, so one path serves every method.
         const fields = [
-            ...this.extractFields(request.body, "body"),
-            ...this.extractFields(request.query, "query"),
+            ...Normalizer.extractFields(request.body, "body"),
+            ...Normalizer.extractFields(request.query, "query"),
         ];
         return {
             requestId: request.id,
@@ -19,15 +19,22 @@ class Normalizer {
             query: this.stringRecord(request.query),
             headers: this.stringRecord(request.headers),
             body: request.body,
-            requestHash: this.hashFields(request.ip, fields),
+            requestHash: Normalizer.hashFields(request.ip, fields),
             fields,
             files: [],
             timestamp: Date.now(),
         };
     }
 
-    hashRequest(ip: string, body: unknown): string {
+    static hashRequest(ip: string, body: unknown): string {
         return this.hashFields(ip, this.extractFields(body, "body"));
+    }
+
+    static hashRequestBody(body: unknown): string {
+        const fields = Normalizer.extractFields(body, 'body');
+        const names = fields.map((f) => f.name).join("");
+        const values = fields.map((f) => String(f.value)).join("");
+        return createHash('sha256').update(names + values).digest('hex');
     }
 
     // `routeOptions.url` is the matched route pattern (e.g. `/*` on a catch-all), not the
@@ -37,19 +44,19 @@ class Normalizer {
         return `${request.method} ${path}`;
     }
 
-    private hashFields(ip: string, fields: RequestField[]): string {
+    private static hashFields(ip: string, fields: RequestField[]): string {
         const names = fields.map((f) => f.name).join("");
         const values = fields.map((f) => String(f.value)).join("");
         return createHash("sha256").update(ip + names + values).digest("hex");
     }
 
-    private extractFields(payload: unknown, location: Location): RequestField[] {
+    private static extractFields(payload: unknown, location: Location): RequestField[] {
         const fields: RequestField[] = [];
         this.flatten(payload, "", location, fields);
         return fields;
     }
 
-    private flatten(node: unknown, path: string, location: Location, out: RequestField[]) {
+    private static flatten(node: unknown, path: string, location: Location, out: RequestField[]) {
         if (node !== null && typeof node === "object") {
             const entries = Array.isArray(node)
                 ? node.map((v, i) => [String(i), v] as const)
