@@ -2,13 +2,13 @@
 ## Purpose
 Canonical typed contracts between Tessera components. Keep them minimal, versioned and tenant-scoped. Model prose is never a runtime contract.
 ## IDs
-`tenantId` identifies the protected application. `endpoint = HTTP method + path`. `policyVersion` identifies the exact active policy. `analysisVersion` identifies application analysis.
+`tenantId` identifies the protected application. `endpoint = "METHOD /path"` (e.g. `"POST /login"`, path without query string). `policyVersion` identifies the exact active policy. `analysisVersion` identifies application analysis.
 ## Normalized request
 ```ts
 NormalizedRequest {
  requestId: string
  tenantId: string
- endpoint: { method: string, path: string }
+ endpoint: string
  clientIp: string
  query: object
  headers: object
@@ -65,7 +65,7 @@ Aggregation priority: `ERROR > POLICY_VIOLATION > SUSPICIOUS > SAFE`. Tool error
 ```ts
 JevInput {
  tenantId: string
- endpoint: { method: string, path: string }
+ endpoint: string
  policyVersion: string
  requestContext: unknown
  staticEvidence: unknown
@@ -88,7 +88,7 @@ Decision {
  action: "ALLOW" | "BLOCK"
  reason: string
  tenantId: string
- endpoint: { method: string, path: string }
+ endpoint: string
  policyVersion: string
  staticVerdict: StaticVerdict
  sampled: boolean

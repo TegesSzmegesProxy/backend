@@ -1,2 +1,1 @@
-export {
-}
+export { MongoRepository } from "./repository";

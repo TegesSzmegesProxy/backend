@@ -9,7 +9,13 @@
       "Read(//home/antek/.claude/**)",
       "Bash(python3 -)",
       "Bash(rm \"architecture.md\")",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(:)",
+      "Read(//home/antek/edge/ingress/**)",
+      "Bash(timeout 6 npx tsx source/bootstrap.ts)",
+      "Bash(echo \"exit $?\")",
+      "Bash(timeout 8 npx tsx /tmp/claude-1000/-home-antek-Tessera/e953185f-57fb-46bf-bdfb-f025f19c3196/scratchpad/dbg.ts)",
+      "Bash(sed -i 's|^    await this.app.register\\(fastifyEnv|    console.log\\(\"DBG a\"\\);\\\\n    await this.app.register\\(fastifyEnv|; s|^    this.broker = new Broker|    console.log\\(\"DBG b\"\\);\\\\n    this.broker = new Broker|; s|^    this.registerRoutes|    console.log\\(\"DBG c\"\\);\\\\n    this.registerRoutes|; s|^    await this.app.listen|    console.log\\(\"DBG d\"\\);\\\\n    await this.app.listen|' source/edge/ingress/server.ts)"
     ]
   }
 }

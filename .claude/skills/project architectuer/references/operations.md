@@ -59,7 +59,7 @@ After restart, reload active tenant policies/configuration and persistent adapti
 
 ## Security
 
-Tenant boundaries must exist in every MongoDB document and Redis key. Cache or persistence bugs must never allow one tenant's policy, request history or verdict to be used for another tenant.
+Tenants are isolated by namespace, not by query filters: each tenant has its own MongoDB database (`{dbName}_t_{tenantId}`, via `MongoStorage.tenantDb`), and every Redis key is prefixed `tessera:{tenantId}:` (via `RedisStorage.tenant`, since Redis has no cheap per-tenant database). Repositories are only a storage abstraction and do not enforce scope themselves. Tenant ids are validated (`A-Za-z0-9_-`, max 40). Cache or persistence bugs must never allow one tenant's policy, request history or verdict to be used for another tenant.
 
 ## Operational invariants
 

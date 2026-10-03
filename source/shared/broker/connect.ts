@@ -1,4 +1,5 @@
 import { createClient } from "redis";
+import { redisUrl } from "../config";
 
 type MessageHandler = (message: string, channel: string) => void | Promise<void>;
 
@@ -10,7 +11,7 @@ class Broker {
   private readonly publisher;
   private readonly subscriber;
 
-  constructor({ url = process.env["REDIS_URL"] ?? "redis://localhost:6379" }: BrokerOptions = {}) {
+  constructor({ url = redisUrl() }: BrokerOptions = {}) {
     this.publisher = createClient({ url });
     this.subscriber = this.publisher.duplicate();
 

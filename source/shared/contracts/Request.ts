@@ -1,13 +1,13 @@
-import { Endpoint } from './Endpoint';
 
 export interface NormalizedRequest {
     requestId: string;
     tenantId: string;
-    endpoint: Endpoint;
+    endpoint: string;
     clientIp: string;
     query: Record<string, string>;
     headers: Record<string, string>;
     body: unknown;
+    requestHash: string,
     fields: RequestField[];
     files: RequestFile[];
     timestamp: number;
