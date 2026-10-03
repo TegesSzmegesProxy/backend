@@ -24,6 +24,8 @@ export interface ToolMetadata<C extends ToolContextType> {
 
 export interface ToolResult {
     tool: string;
+    /** The field or file the tool inspected; absent for whole-request tools. Set by the Runner. */
+    target?: string;
     status: 'SUCCESS' | 'ERROR';
     verdict: 'SAFE' | 'SUSPICIOUS' | 'POLICY_VIOLATION' | 'ERROR';
     evidence: unknown | undefined;

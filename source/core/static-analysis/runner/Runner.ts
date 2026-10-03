@@ -14,7 +14,8 @@ export class Runner {
 
         for (const step of plan) {
             for (const context of this.resolveContexts(request, step)) {
-                results.push(this.execute(step.tool, context));
+                const result = this.execute(step.tool, context);
+                results.push('target' in step ? { ...result, target: step.target } : result);
             }
         }
 

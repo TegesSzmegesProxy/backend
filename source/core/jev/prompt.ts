@@ -1,12 +1,22 @@
-import { ScoreCriteria } from '@typesafe-ai/sdk';
+import { noul, score } from '@typesafe-ai/sdk';
 
-export const JEV_PROMPT = 'Assign a security risk score from 1 to 100 to the current request. Evaluate the request together with the provided endpoint context, application policy, system environment, known vulnerabilities, deterministic security tool results, and recent request history. The score represents how strongly the available evidence indicates malicious behavior, exploitation, unauthorized access, security abuse, or a policy violation. Do not evaluate the request in isolation. Consider the intended purpose of the endpoint and the normal behavior of the application. Give the highest weight to concrete technical evidence such as confirmed exploit patterns, explicit policy violations, dangerous data flows, reachable vulnerabilities, and consistent malicious request sequences. A suspicious string or unusual value alone is not sufficient for a high score. The existence of a vulnerable component alone is not sufficient to conclude that the current request exploits it. Increase the score when multiple independent signals reinforce the same attack hypothesis. Use request history to detect enumeration, probing, escalation, replay, abuse, or multi-step exploitation. If evidence is ambiguous, prefer a lower score and reflect the uncertainty. A score of 70 or higher should indicate strong evidence of malicious or security-relevant behavior. A score of 85 or higher should indicate very strong evidence, such as a matching exploit pattern combined with relevant application or environment context. A score of 95 or higher should be reserved for cases with extremely strong evidence of an active exploit, clear security-boundary violation, or near-certain malicious behavior.';
-export const JEV_CRITERIA: ScoreCriteria = [
-    '1-10: Clearly benign, expected behavior. No meaningful security indicator, anomaly, policy violation, or suspicious sequence.',
-    '11-30: Low risk. Minor anomaly or unusual behavior, but strong legitimate explanations remain and there is little evidence of an attack.',
-    '31-50: Suspicious. Meaningful security indicators or unusual behavior are present, but evidence of malicious intent or exploitation is incomplete.',
-    '51-69: High suspicion. Multiple indicators suggest probing, abuse, exploitation, unauthorized access, or policy violation, but important uncertainty remains.',
-    '70-84: Likely attack. Strong contextual evidence indicates malicious behavior, an exploit attempt, unauthorized access, dangerous resource access, or a serious policy violation.',
-    '85-94: Very likely attack. Multiple independent signals strongly reinforce the same attack hypothesis, or a known vulnerability is reachable and the request matches its attack conditions.',
-    '95-100: Critical. Extremely strong evidence of an active exploit, explicit security-boundary crossing, confirmed malicious sequence, or near-certain malicious behavior.',
-]
+/**
+ * The enforcement question. Its P(yes) is the attack probability the thresholds compare against.
+ * The wording describes what a value would do when the application uses it, never which words it contains,
+ * so it generalizes instead of encoding individual requests.
+ */
+export const JEV_ATTACK_QUESTION = noul(
+    'Is this request an attack attempt? Judge each field value by what it would do when the endpoint uses it as intended, not by the words or characters it contains. patternMatches come from a keyword and regex pre-filter that fires on ordinary text; verify each against the actual value.',
+    {
+        true: 'At least one value contains syntax that would change how the application interprets it: breaking out of a quoted string or literal, injecting query clauses, statements, markup, script, template expressions, shell commands, path segments, or URLs pointing at internal hosts, or an object or array of query operators where a plain value is expected. Or the request explicitly abuses the endpoint or the caller\'s authorization. This holds whether or not the attack would succeed.',
+        false: 'Every value is plausible input for this endpoint, including names, free text, secrets such as passwords that are compared or hashed rather than interpreted, or content that merely contains programming keywords, punctuation, or special characters without forming syntax that would change how the application interprets it. A pattern match on such a value is not evidence of an attack.',
+    }
+);
+
+/** Severity for display and logging only; enforcement uses JEV_ATTACK_QUESTION. */
+export const JEV_SEVERITY_QUESTION = score('How severe is the security risk of this request?', [
+    'Benign: ordinary input for this endpoint.',
+    'Anomalous: unusual input or probing, without syntax that would change how the application interprets it.',
+    'Attack attempt: a value carries injection, traversal, SSRF, or authorization abuse, whether or not it would succeed.',
+    'Critical: an attack attempt with evidence it can succeed or is part of an escalating sequence.',
+]);

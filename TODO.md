@@ -62,7 +62,7 @@ Owners:
 ### [T00] [P0] [TODO] Remaining open decisions
 - Description: To be decided by the project owner (not invented) and recorded in the references:
   1. **JEV API:** endpoint, auth and wire format. Blocks T30.
-  2. **Tessera-down behavior:** Nginx fails open (route to upstream) or closed (503)? Per tenant?
+  2. **Tessera-down behavior:** Nginx s open (route to upstream) or closed (503)? Per tenant?
   3. **Unknown endpoint:** confirm pass-through as default and name the `runtimeConfig` key.
   4. **No valid bundle at proxy startup** (control plane unreachable, no last known good): refuse to start, or skip that tenant and apply which behavior?
   5. **HTTP stack:** change `SKILL.md` and `system.md` from Express to Fastify.
@@ -71,6 +71,7 @@ Owners:
   8. **Dashboard auth:** organization-level auth for dashboard users (open in `control-plane.md`). For the hackathon, is a single platform admin bearer key enough?
   9. **Active scanning in the collector:** nuclei sends active payloads and nmap scans ports. Who confirms target ownership, and is it opt-in per run? `analysis.md` lists Syft/Trivy/Nmap; the code also runs nuclei, httpx and lynis.
   10. **Local development without a control plane:** may the proxy load a signed bundle from a file (still verified), or must dev always run both deployables?
+  11. **JEV score scale:** decided: enforcement uses `attackProbability` (JEV yes/no P(attack)) against one tenant threshold; severity `score` (0–3) and `confidence` are informational. Architecture references are aligned. Still to do: pass policy `jevContext` and Redis request history into the JEV state (slots in `JevClient.buildState`), and re-check `scripts/jev-eval.ts` whenever the question wording changes.
 - Files/modules: `.claude/skills/project architectuer/SKILL.md`, `references/{system,runtime,contracts,operations,control-plane,analysis,static-analysis}.md`
 - Depends on: —
 - Acceptance criteria: Each point has a written answer in the references, and no two reference files contradict each other.
@@ -301,7 +302,9 @@ Owners:
 - Depends on: T25
 - Acceptance criteria: `' OR 1=1 --`, `<script>`, `../../etc/passwd`, `http://169.254.169.254/` flagged; `.png` with PDF magic → `POLICY_VIOLATION`; benign → SAFE.
 
-### [T29] [P0] [TODO] Sampling with secure randomness
+### [T29] [P0] [PARTIAL] Sampling with secure randomness
+- Done: `Sampler.shouldSample(tenantId, endpoint)` with `crypto.randomInt` ([Sampler.ts](source/core/sampling/Sampler.ts)); the orchestrator consults it only for SAFE requests. Tests cover N=0, N=100, N=10 over 100k and no `Math.random`.
+- Remaining: N comes from `SamplingController`, whose `SamplingConfig` is a placeholder in the ingress until the endpoint policy supplies it (T04, T21).
 - Description: `shouldSample(config)` with `crypto.randomInt`, N clamped to `[minN, maxN]`; only SAFE consults sampling; SUSPICIOUS always goes to JEV.
 - Files/modules: `source/core/sampling/`
 - Depends on: T04
@@ -313,7 +316,9 @@ Owners:
 - Depends on: T04, T00 (point 1)
 - Acceptance criteria: Malformed or late response → `JevUnavailable`; valid parses; adapter chosen by config.
 
-### [T31] [P0] [TODO] Decision orchestrator
+### [T31] [P0] [PARTIAL] Decision orchestrator
+- Done: `static verdict → sampling → JEV → thresholds → Decision` in `source/core/decisionOrchestrator/` (the `source/core/decision/` stub is unused). `Sampler`, `AdaptiveControl` (adaptive N, effective thresholds, feedback), the JEV client and per-tenant `RuntimeConfig` are injected. Static `ERROR`, suspicious-without-JEV and sampled-without-JEV follow configured behavior; `sampledWhenJevUnavailable` is new and needs a `RuntimeConfig` key (T04). A malformed JEV result counts as JEV unavailable.
+- Remaining: tenant/snapshot/endpoint resolution, unknown endpoint, normalization errors, `policyVersion` on `Decision`, thresholds and failure behavior from the bundle.
 - Description:
   - `tenant → snapshot → endpoint → normalize → static analysis → sampling → JEV → thresholds → Decision`, without Fastify types.
   - Tenant failure behavior for normalization errors, static `ERROR` and JEV unavailable.
@@ -342,7 +347,9 @@ Owners:
 - Depends on: T31
 - Acceptance criteria: Only last 3 returned; tenants isolated per IP; Redis down → decisions still correct.
 
-### [T35] [P1] [TODO] Adaptive state and sampling controller
+### [T35] [P1] [PARTIAL] Adaptive state and sampling controller
+- Done: `AdaptiveControl` with asymmetric EWMA per tenant and endpoint ([AttackRateTracker](source/feedback/metrics/AttackRateTracker.ts)), `SamplingController` (N within bounds, starts at the configured N, endpoint weighted above tenant) and `ThresholdController` (tighten-only attack probability threshold down to the floor, unless locked). The orchestrator feeds back every JEV ATTACK/BENIGN and every unsampled SAFE request (threshold signal only); static blocks and JEV failures never are. Tested, including tenant isolation.
+- Remaining: persist `AdaptiveState` in proxy Mongo (flush periodically and on shutdown, restore on restart, including the observation counts the controller uses); take `alpha`, `endpointWeight` and `SamplingConfig` from the bundle.
 - Description: Persist `AdaptiveState` (tenant + endpoint EWMA, α) in proxy Mongo; update only from JEV ATTACK/BENIGN; flush periodically and on shutdown. Controller computes endpoint N from endpoint and tenant EWMA (endpoint weighted higher) within user bounds; never touches thresholds.
 - Files/modules: `source/feedback/{metrics,sampler,threshold}/`
 - Depends on: T31, T29

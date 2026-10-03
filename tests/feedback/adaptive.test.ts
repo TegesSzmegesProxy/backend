@@ -10,9 +10,8 @@ const LOGIN = 'POST /login';
 
 const sampling: SamplingConfig = { probabilityN: 0.2, minN: 0.05, maxN: 1 };
 const thresholds: ThresholdConfig = {
-    maliciousScoreThreshold: 3,
-    confidenceThreshold: 0.8,
-    confidenceFloor: 0.5,
+    attackProbabilityThreshold: 0.8,
+    attackProbabilityFloor: 0.5,
     locked: false,
 };
 
@@ -60,12 +59,12 @@ describe('adaptive sampling', () => {
         const control = new AdaptiveControl();
         repeat(control, TENANT, 'ATTACK', 50);
         expect(control.samplingProbability(OTHER_TENANT, LOGIN, sampling)).toBeCloseTo(0.2, 5);
-        expect(control.effectiveThresholds(OTHER_TENANT, LOGIN, thresholds).confidenceThreshold).toBe(0.8);
+        expect(control.effectiveThresholds(OTHER_TENANT, LOGIN, thresholds).attackProbabilityThreshold).toBe(0.8);
     });
 });
 
 describe('tighten-only thresholds', () => {
-    const borderline = { score: 5, confidence: 0.7 };
+    const borderline = { attackProbability: 0.7 };
 
     it('blocks a borderline result only after attacks tighten the threshold', () => {
         const control = new AdaptiveControl();
@@ -73,9 +72,8 @@ describe('tighten-only thresholds', () => {
 
         repeat(control, TENANT, 'ATTACK', 30);
         const tightened = control.effectiveThresholds(TENANT, LOGIN, thresholds);
-        expect(tightened.confidenceThreshold).toBeLessThan(0.7);
-        expect(tightened.confidenceThreshold).toBeGreaterThanOrEqual(thresholds.confidenceFloor);
-        expect(tightened.maliciousScoreThreshold).toBe(3);
+        expect(tightened.attackProbabilityThreshold).toBeLessThan(0.7);
+        expect(tightened.attackProbabilityThreshold).toBeGreaterThanOrEqual(thresholds.attackProbabilityFloor);
         expect(control.classify(borderline, tightened)).toBe('ATTACK');
     });
 
@@ -83,7 +81,7 @@ describe('tighten-only thresholds', () => {
         const control = new AdaptiveControl();
         repeat(control, TENANT, 'ATTACK', 30);
         repeat(control, TENANT, 'UNSAMPLED', 2000);
-        const relaxed = control.effectiveThresholds(TENANT, LOGIN, thresholds).confidenceThreshold;
+        const relaxed = control.effectiveThresholds(TENANT, LOGIN, thresholds).attackProbabilityThreshold;
         expect(relaxed).toBeLessThanOrEqual(0.8);
         expect(relaxed).toBeGreaterThan(0.79);
     });
@@ -92,7 +90,7 @@ describe('tighten-only thresholds', () => {
         const control = new AdaptiveControl();
         repeat(control, TENANT, 'ATTACK', 50);
         const locked = control.effectiveThresholds(TENANT, LOGIN, { ...thresholds, locked: true });
-        expect(locked.confidenceThreshold).toBe(0.8);
+        expect(locked.attackProbabilityThreshold).toBe(0.8);
         expect(control.classify(borderline, locked)).toBe('BENIGN');
     });
 });
