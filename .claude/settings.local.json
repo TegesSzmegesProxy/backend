@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -q -m 'Merge remote-tracking branch '\\\\''origin/main'\\\\'' into main *)",
+      "Bash(timeout 60 git push -u origin main)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(git ls-remote *)",
+      "Read(//home/antek/**)",
+      "Read(//home/antek/.claude/**)",
+      "Bash(python3 -)",
+      "Bash(rm \"architecture.md\")"
+    ]
+  }
+}
