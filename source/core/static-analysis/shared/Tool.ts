@@ -29,7 +29,7 @@ export interface ToolResult {
     evidence: unknown | undefined;
 }
 
-interface ContextMap {
+export interface ContextMap {
     [ToolContextType.Field]: RequestField;
     [ToolContextType.File]: RequestFile;
     [ToolContextType.Full]: NormalizedRequest;
