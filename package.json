@@ -16,20 +16,24 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --exec tsx ./source/bootstrap.ts"
+    "dev": "nodemon --exec tsx ./source/bootstrap.ts",
+    "analyze:mock": "tsx ./scripts/environment-mock.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.39.5",
     "@fastify/env": "^7.0.0",
     "@fastify/http-proxy": "^11.6.3",
+    "@fastify/reply-from": "^12.6.5",
     "@toon-format/toon": "^4.1.1",
     "@typesafe-ai/sdk": "^0.6.0",
     "eslint-config-prettier": "^10.1.8",
+    "fast-xml-parser": "^5.11.2",
     "fastify": "^5.12.5",
     "mongodb": "^7.7.0",
     "redis": "^6.3.0",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
