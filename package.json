@@ -1,0 +1,29 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "Proxy backend",
+  "homepage": "https://github.com/TegesSzmegesProxy/backend#readme",
+  "bugs": {
+    "url": "https://github.com/TegesSzmegesProxy/backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TegesSzmegesProxy/backend.git"
+  },
+  "license": "MIT",
+  "author": "TSP",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@eslint/js": "^9.39.5",
+    "eslint-config-prettier": "^10.1.8",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^3.2.7"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4"
+  }
+}

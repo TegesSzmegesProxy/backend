@@ -1,0 +1,16 @@
+dist
+node_modules
+
+*.config.js
+*.config.ts
+build.js
+
+package.json
+package-lock.js
+
+tsconfig*.json
+
+*.md
+*.yml
+*.yaml
+*.json
