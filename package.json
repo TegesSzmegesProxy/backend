@@ -22,6 +22,8 @@
     "@eslint/js": "^9.39.5",
     "@fastify/env": "^7.0.0",
     "@fastify/http-proxy": "^11.6.3",
+    "@toon-format/toon": "^4.1.1",
+    "@typesafe-ai/sdk": "^0.6.0",
     "eslint-config-prettier": "^10.1.8",
     "fastify": "^5.12.5",
     "mongodb": "^7.7.0",
