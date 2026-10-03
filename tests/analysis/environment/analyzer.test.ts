@@ -7,7 +7,7 @@ import {
     EnvironmentInputError,
     type CommandResult,
     type CommandRunner,
-} from '../../../source/analysis/environment';
+} from '../../../source/core/environment-analysis';
 
 const fixture = (name: string) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
 const ok = (stdout: string): CommandResult => ({ stdout, stderr: '', exitCode: 0 });

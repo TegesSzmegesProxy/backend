@@ -7,7 +7,7 @@
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { CommandError, EnvironmentAnalyzer, type CommandRunner } from '../source/analysis/environment';
+import { CommandError, EnvironmentAnalyzer, type CommandRunner } from '../source/core/environment-analysis';
 
 const fixtures = join(__dirname, '..', 'tests', 'analysis', 'environment', 'fixtures');
 const fixture = (name: string) => readFileSync(join(fixtures, name), 'utf8');
