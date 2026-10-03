@@ -98,8 +98,15 @@ Decision {
 Only `ALLOW` reaches the upstream application.
 ## JEV thresholds
 Each tenant configures:
-`maliciousScoreThreshold`
-`confidenceThreshold`
+```ts
+ThresholdConfig {
+ maliciousScoreThreshold: number
+ confidenceThreshold: number
+ confidenceFloor: number
+ locked: boolean
+}
+```
+When not locked, the tenant threshold attack rate lowers the effective `confidenceThreshold` toward `confidenceFloor` (tighten-only). `maliciousScoreThreshold` is never adapted.
 A JEV result is an `ATTACK` only when both configured conditions are satisfied:
 `score > maliciousScoreThreshold && confidence > confidenceThreshold`
 
@@ -119,10 +126,12 @@ Sampling is endpoint-scoped. `N` is adaptively controlled within `[minN, maxN]`.
 AdaptiveState {
  tenantAttackRateEWMA: number
  endpointAttackRateEWMA: Record<string, number>
- alpha: number
+ tenantThresholdRateEWMA: number
+ alpha: { up: number, down: number }
 }
 ```
-Only JEV `ATTACK/BENIGN` results contribute to attack-rate feedback.
+EWMA is asymmetric: `alpha.up` when the observation is above the average, `alpha.down` otherwise (`up > down`), so rates rise fast and recover slowly.
+Only JEV `ATTACK/BENIGN` results contribute to the sampling rates. The threshold rate also counts unsampled, statically-safe requests as benign. Static violations/errors contribute to neither.
 ## Policy
 ```ts
 Policy {

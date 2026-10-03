@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Controls runtime JEV sampling using observed attack behavior. Adaptive control reduces JEV cost while increasing analysis of suspicious endpoints. It must not modify user-defined security thresholds unless explicitly supported later.
+Controls runtime JEV sampling using observed attack behavior. Adaptive control reduces JEV cost while increasing analysis of suspicious endpoints.
 
 ## Flow
 
@@ -36,6 +36,8 @@ The user configures:
 * JEV confidence threshold.
   These thresholds may be locked so adaptive/runtime mechanisms cannot modify them. Their exact decision rule belongs to `contracts.md`.
 
+If threshold is not locked, attack-rate can tighten it until it reaches a user defined T_floor. Blocking can only get stricter, never looser.
+
 ## Controller
 
 The controller uses smoothed tenant/endpoint attack rates to calculate endpoint sampling. Higher endpoint attack rates should increase that endpoint's sampling more strongly than the tenant-wide baseline. Lower attack rates may reduce sampling toward the configured minimum.
@@ -43,7 +45,7 @@ The controller must never bypass static blocking or force an otherwise blocked r
 
 ## Feedback
 
-Every JEV result classified as `ATTACK` or `BENIGN` is eligible for attack-rate feedback. Unsampled requests provide no attack-rate observation.
+Every JEV result classified as `ATTACK` or `BENIGN` is eligible for attack-rate feedback. Unsampled requests do not affect sampling rate, but they do affect threshold.
 
 ## Invariants
 
