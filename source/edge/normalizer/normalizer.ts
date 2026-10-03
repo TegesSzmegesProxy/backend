@@ -26,17 +26,6 @@ class Normalizer {
         };
     }
 
-    static hashRequest(ip: string, body: unknown): string {
-        return this.hashFields(ip, this.extractFields(body, "body"));
-    }
-
-    static hashRequestBody(body: unknown): string {
-        const fields = Normalizer.extractFields(body, 'body');
-        const names = fields.map((f) => f.name).join("");
-        const values = fields.map((f) => String(f.value)).join("");
-        return createHash('sha256').update(names + values).digest('hex');
-    }
-
     // `routeOptions.url` is the matched route pattern (e.g. `/*` on a catch-all), not the
     // requested path, so the path is taken from the raw URL.
     private endpoint(request: FastifyRequest): string {

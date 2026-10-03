@@ -13,9 +13,9 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
     private static readonly WINDOW_MS = 10_000;
     private static readonly MAX_ENTRIES = 100_000;
 
-    // key -> most recent sighting. Static so the state is shared however often the framework instantiates the tool.
-    private static readonly seen = new Map<string, SeenRequest>();
-    private static lastSweep = 0;
+    // key -> most recent sighting. Per instance: the plan must reuse one instance across requests.
+    private readonly seen = new Map<string, SeenRequest>();
+    private lastSweep = 0;
 
     constructor () {
         super({
@@ -42,9 +42,9 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
         const now = Date.now();
         const key = `${context.tenantId}|${context.endpoint}|${context.requestHash}`;
 
-        DuplicateRequest.sweep(now);
+        this.sweep(now);
 
-        const previous = DuplicateRequest.seen.get(key);
+        const previous = this.seen.get(key);
         const inWindow = previous !== undefined && now - previous.lastSeen <= WINDOW_MS;
 
         // Same requestId means the pipeline is analyzing the same request again (retry, re-run),
@@ -58,9 +58,9 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
             : { requestId: context.requestId, firstSeen: now, lastSeen: now, count: 1 };
 
         // delete + set moves the key to the end of the Map, so insertion order stays "oldest sighting first"
-        DuplicateRequest.seen.delete(key);
-        DuplicateRequest.seen.set(key, entry);
-        DuplicateRequest.evictOverflow();
+        this.seen.delete(key);
+        this.seen.set(key, entry);
+        this.evictOverflow();
 
         if (entry.count > 1) {
             return {
@@ -90,33 +90,27 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
     }
 
     // Removes expired entries, at most once per window, so the map can't grow forever.
-    private static sweep(now: number): void {
-        if (now - DuplicateRequest.lastSweep < DuplicateRequest.WINDOW_MS) {
+    private sweep(now: number): void {
+        if (now - this.lastSweep < DuplicateRequest.WINDOW_MS) {
             return;
         }
-        DuplicateRequest.lastSweep = now;
+        this.lastSweep = now;
 
-        for (const [key, entry] of DuplicateRequest.seen) {
+        for (const [key, entry] of this.seen) {
             if (now - entry.lastSeen > DuplicateRequest.WINDOW_MS) {
-                DuplicateRequest.seen.delete(key);
+                this.seen.delete(key);
             }
         }
     }
 
     // Hard cap in case a flood of unique hashes arrives between sweeps; evicts the oldest sightings first.
-    private static evictOverflow(): void {
-        while (DuplicateRequest.seen.size > DuplicateRequest.MAX_ENTRIES) {
-            const oldest = DuplicateRequest.seen.keys().next();
+    private evictOverflow(): void {
+        while (this.seen.size > DuplicateRequest.MAX_ENTRIES) {
+            const oldest = this.seen.keys().next();
             if (oldest.done) {
                 return;
             }
-            DuplicateRequest.seen.delete(oldest.value);
+            this.seen.delete(oldest.value);
         }
-    }
-
-    // For tests.
-    static reset(): void {
-        DuplicateRequest.seen.clear();
-        DuplicateRequest.lastSweep = 0;
     }
 }

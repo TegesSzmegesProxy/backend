@@ -1,9 +1,9 @@
+import { createHash } from 'node:crypto';
 import { NormalizedRequest } from '@tessera/shared/contracts';
 import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { encode } from '@toon-format/toon';
 import { StaticVerdict } from '../static-analysis/aggregator';
 import { JEV_ATTACK_QUESTION, JEV_SEVERITY_QUESTION } from './prompt';
-import { Normalizer } from '@tessera/edge/normalizer';
 
 export interface DynamicVerdict {
     /** Expected severity level (0 benign to 3 critical); for display, not enforcement. */
@@ -33,6 +33,7 @@ interface JevState {
 }
 
 const PATTERN_MATCH_NOTE = 'Keyword/regex pre-filter. Matches are frequent on ordinary text and are not findings.';
+const VERDICT_CACHE_TTL_SECONDS = 60 * 60 * 24;
 
 export class JevClient {
     constructor(
@@ -40,26 +41,35 @@ export class JevClient {
         private readonly cache: VerdictStore
     ) {}
 
-    private getRequestKey(request: NormalizedRequest) {
-        return `${request.endpoint}:${Normalizer.hashRequestBody(request.body)}`;
+    // The verdict is a function of exactly what the model sees, so the key is a hash of that state.
+    // Keying on less (e.g. the body alone) would let one cached verdict answer for a different request.
+    private cacheKey(state: string): string {
+        return createHash('sha256').update(state).digest('hex');
     }
 
-    private storeVerdict(request: NormalizedRequest, verdict: DynamicVerdict) {
-        this.cache.set(this.getRequestKey(request), JSON.stringify(verdict), 60 * 60 * 24);
+    // Fire-and-forget: the cache is non-authoritative, so a failed write must not fail the verdict.
+    private storeVerdict(key: string, verdict: DynamicVerdict) {
+        this.cache.set(key, JSON.stringify(verdict), VERDICT_CACHE_TTL_SECONDS)
+            .catch(err => console.error('Storing to cache failed', err));
     }
 
-    private async checkVerdict(request: NormalizedRequest): Promise<DynamicVerdict | undefined> {
-        const verdict = await this.cache.get(this.getRequestKey(request));
-        if (verdict === null) return undefined;
+    // Any cache failure, unreadable entry or out-of-range value counts as a miss, so the model decides instead.
+    private async checkVerdict(key: string): Promise<DynamicVerdict | undefined> {
+        let json: Record<string, unknown>;
+        try {
+            const verdict = await this.cache.get(key);
+            if (verdict === null) return undefined;
+            json = JSON.parse(verdict);
+        } catch (err) {
+            console.warn('Reading from cache failed', err);
+            return undefined;
+        }
+        if (json === null || typeof json !== 'object') return undefined;
 
-        const json = JSON.parse(verdict);
-        const score = json['score'];
-        const attackProbability = json['attackProbability'];
-        const confidence = json['confidence'];
-
-        if (score === undefined || attackProbability === undefined || confidence === undefined) return;
+        const { score, attackProbability, confidence } = json;
         if (typeof score !== 'number' || typeof attackProbability !== 'number' || typeof confidence !== 'number') return;
-        if (isNaN(score) || isNaN(attackProbability) || isNaN(confidence)) return;
+        if (!Number.isFinite(score) || !Number.isFinite(confidence)) return;
+        if (!Number.isFinite(attackProbability) || attackProbability < 0 || attackProbability > 1) return;
 
         return {
             score,
@@ -69,11 +79,13 @@ export class JevClient {
     }
 
     async createVerdict(request: NormalizedRequest, staticAnalysis: StaticVerdict): Promise<DynamicVerdict> {
-        const previousVerdict = await this.checkVerdict(request);
+        const state = encode(this.buildState(request, staticAnalysis));
+        const key = this.cacheKey(state);
+        const previousVerdict = await this.checkVerdict(key);
         if (previousVerdict !== undefined) return previousVerdict;
-        
+
         const response = await this.model.systemOne({
-            state: encode(this.buildState(request, staticAnalysis)),
+            state,
             questions: {
                 attack: JEV_ATTACK_QUESTION,
                 severity: JEV_SEVERITY_QUESTION,
@@ -91,7 +103,7 @@ export class JevClient {
             confidence: Math.abs(2 * attackProbability - 1),
         };
 
-        this.storeVerdict(request, verdict);
+        this.storeVerdict(key, verdict);
 
         return verdict;
     }

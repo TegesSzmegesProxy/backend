@@ -80,6 +80,77 @@ describe('JevClient', () => {
         expect(verdict.confidence).toBeCloseTo(0.8);
     });
 
+    describe('verdict cache', () => {
+        function memoryStore(): VerdictStore & { entries: Map<string, string> } {
+            const entries = new Map<string, string>();
+            return {
+                entries,
+                get: async (key) => entries.get(key) ?? null,
+                set: async (key, value) => void entries.set(key, value),
+            };
+        }
+
+        it('answers a repeated request from the cache', async () => {
+            const { model, systemOne } = fakeModel(0.9);
+            const client = new JevClient(model, memoryStore());
+
+            await client.createVerdict(request, suspicious);
+            const cached = await client.createVerdict(request, suspicious);
+
+            expect(systemOne).toHaveBeenCalledTimes(1);
+            expect(cached.attackProbability).toBe(0.9);
+        });
+
+        it('does not reuse a verdict for a request that differs only in its query', async () => {
+            const { model, systemOne } = fakeModel(0.1);
+            const client = new JevClient(model, memoryStore());
+            const withQuery = (q: string): NormalizedRequest => ({
+                ...request,
+                body: undefined,
+                fields: [{ name: 'q', value: q, type: 'string', location: 'query' }],
+            });
+
+            await client.createVerdict(withQuery('hello'), suspicious);
+            await client.createVerdict(withQuery("' OR 1=1 --"), suspicious);
+
+            expect(systemOne).toHaveBeenCalledTimes(2);
+        });
+
+        it('falls back to the model when the cache fails', async () => {
+            const { model, systemOne } = fakeModel(0.9);
+            const failing: VerdictStore = {
+                get: async () => { throw new Error('redis down'); },
+                set: async () => { throw new Error('redis down'); },
+            };
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            const verdict = await new JevClient(model, failing).createVerdict(request, suspicious);
+
+            expect(verdict.attackProbability).toBe(0.9);
+            expect(systemOne).toHaveBeenCalledTimes(1);
+            warn.mockRestore();
+            error.mockRestore();
+        });
+
+        it('ignores corrupt or out-of-range cache entries', async () => {
+            const { model, systemOne } = fakeModel(0.9);
+            const store = memoryStore();
+            const client = new JevClient(model, store);
+            await client.createVerdict(request, suspicious);
+            const [key] = store.entries.keys();
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+            for (const entry of ['not json', 'null', JSON.stringify({ score: 0, attackProbability: 7, confidence: 1 })]) {
+                store.entries.set(key, entry);
+                await client.createVerdict(request, suspicious);
+            }
+
+            expect(systemOne).toHaveBeenCalledTimes(4);
+            warn.mockRestore();
+        });
+    });
+
     it.each([NaN, -0.1, 1.2, undefined as unknown as number])('rejects an attack probability of %s', async noul => {
         const { model } = fakeModel(noul);
 
