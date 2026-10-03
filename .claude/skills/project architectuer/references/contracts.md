@@ -76,12 +76,14 @@ JevInput {
 ## JEV result
 ```ts
 JevResult {
- verdict: "BENIGN" | "ATTACK"
- score: 1 | 2 | 3 | 4 | 5 | 6
- confidence: number
+ verdict: "BENIGN" | "ATTACK"   // derived from the effective threshold, not returned by JEV
+ threshold: number              // effective attackProbabilityThreshold the verdict was compared against
+ attackProbability: number      // 0-1, JEV's P(yes) to "is this request an attack attempt?"
+ score: number                  // 0-3 expected severity level; display/logging only
+ confidence: number             // |2 * attackProbability - 1|; display/logging only
 }
 ```
-`score` = maliciousness. `confidence` = confidence in the classification.
+JEV receives only the endpoint, field names/locations/values (never truncated), file metadata and field-attributed static pattern matches. Request identifiers, tenant, client IP, headers and static verdict labels are not sent.
 ## Final decision
 ```ts
 Decision {
@@ -100,17 +102,14 @@ Only `ALLOW` reaches the upstream application.
 Each tenant configures:
 ```ts
 ThresholdConfig {
- maliciousScoreThreshold: number
- confidenceThreshold: number
- confidenceFloor: number
+ attackProbabilityThreshold: number   // T, at least 0 and below 1
+ attackProbabilityFloor: number       // in [0, T]
  locked: boolean
 }
 ```
-When not locked, the tenant threshold attack rate lowers the effective `confidenceThreshold` toward `confidenceFloor` (tighten-only). `maliciousScoreThreshold` is never adapted.
-A JEV result is an `ATTACK` only when both configured conditions are satisfied:
-`score > maliciousScoreThreshold && confidence > confidenceThreshold`
-
-If the score exceeds `maliciousScoreThreshold` but confidence does not exceed `confidenceThreshold`, the result is `ALLOW`.
+A JEV result is an `ATTACK` only when `attackProbability > effective threshold`; otherwise it is `BENIGN`.
+When not locked, the tenant threshold attack rate lowers the effective threshold from `attackProbabilityThreshold` toward `attackProbabilityFloor` (tighten-only); locked thresholds are used as configured.
+Severity `score` and `confidence` never affect enforcement.
 Thresholds may be locked by configuration. Exact boundary operators are part of the active configuration.
 ## Sampling
 ```ts

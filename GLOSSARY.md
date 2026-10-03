@@ -7,8 +7,11 @@
 - **Tool**: a deterministic check (schema, resource, injection, url, file-magic) that produces a tool result.
 - **Static verdict**: the aggregated result of all tools: `SAFE`, `SUSPICIOUS`, `POLICY_VIOLATION`, or `ERROR`.
 - **Sampling (N)**: the percentage of `SAFE` requests sent to JEV.
-- **Threshold (T)**: the tenant-set trust threshold applied to JEV score and confidence. Independent of N.
-- **JEV**: the external classification model that returns a score, a confidence, and a verdict. Not a conversational LLM.
+- **Threshold (T)**: the tenant-set threshold applied to the JEV attack probability, with a floor (`T_floor`) it may tighten to under attack. Independent of N.
+- **Threshold controller**: turns the tenant's threshold into the effective threshold (tightened toward the floor under attack unless locked) and classifies a JEV attack probability as `ATTACK` (strictly above) or `BENIGN`. Its result decides the request and is the only JEV signal behind the attack rate.
+- **JEV**: the external classification model that scores a request on a rubric of levels. Not a conversational LLM.
+- **Attack probability**: JEV's P(yes) to "is this request an attack attempt?" (`JEV_ATTACK_QUESTION`). It alone decides enforcement; severity `score` and `confidence` (`|2p-1|`) are informational.
+- **Pattern match**: a static tool hit passed to JEV as a hint, attributed to the field it matched. Not a finding.
 - **Decision**: the final `ALLOW` or `BLOCK`, recorded with the policy version.
 - **Policy**: the human-readable and structured rules for one tenant, versioned and immutable once written.
 - **Active policy**: the policy version a tenant currently runs on.

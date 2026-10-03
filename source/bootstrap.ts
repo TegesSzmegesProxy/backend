@@ -29,7 +29,7 @@ async function main(): Promise<void> {
 //   THIS IS top level database of app
   const mongo = new MongoStorage();
   const tenantsDb = new MongoStorage({dbName: tenantsDbName()})
-  await mongo.connect();    
+  // await mongo.connect();    
   const redis = new RedisStorage();
   const broker = new Broker();
   await Promise.all([

@@ -47,15 +47,15 @@ Redis stores the last 3 requests for each `tenant + client IP`. History is conte
 
 ## JEV
 
-Send the minimum required structured context: normalized request, relevant static evidence, endpoint/field policy context and recent request history. JEV returns `classification`, maliciousness `score 1-6`, and `confidence`. Validate the response before use.
+Send the minimum required structured context: normalized request, relevant static evidence, endpoint/field policy context and recent request history. JEV returns an attack probability (P(yes) to "is this an attack attempt?") and a severity score; Tessera derives `confidence` and the classification. Validate the response before use; an invalid attack probability counts as JEV unavailable.
 
 ## Threshold
 
-`T` operates on JEV confidence. JEV score describes maliciousness; confidence determines whether the classification is trusted enough for enforcement. Exact comparison/mapping belongs to `contracts.md`. A JEV result whose score exceeds the threshold but whose confidence does not is `ALLOW`.
+`T` operates on the JEV attack probability: `attackProbability > effective T` is `ATTACK`, where an unlocked `T` tightens toward `T_floor` under attack. Severity score and confidence are for observability only. Exact comparison belongs to `contracts.md`.
 
 ## Decision
 
-Orchestration combines static verdict, sampling, JEV result, confidence threshold, policy version and failure state into `ALLOW | BLOCK`. Only `ALLOW` reaches upstream.
+Orchestration combines static verdict, sampling, JEV result, effective threshold, policy version and failure state into `ALLOW | BLOCK`. Only `ALLOW` reaches upstream.
 
 ## Forwarding
 

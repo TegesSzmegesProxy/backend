@@ -6,7 +6,7 @@ Controls runtime JEV sampling using observed attack behavior. Adaptive control r
 
 ## Flow
 
-`Request -> Static Analysis -> Sampling(N) -> JEV -> Score + Confidence -> Decision`
+`Request -> Static Analysis -> Sampling(N) -> JEV -> Attack probability -> Threshold(T) -> Decision`
 `JEV ATTACK/BENIGN -> Attack Rate -> EWMA -> Controller -> N`
 
 ## Attack rate
@@ -32,11 +32,11 @@ The initial sampling value is configured by the user. Code analysis may suggest 
 
 The user configures:
 
-* maliciousness score threshold;
-* JEV confidence threshold.
-  These thresholds may be locked so adaptive/runtime mechanisms cannot modify them. Their exact decision rule belongs to `contracts.md`.
+* attack probability threshold `T`;
+* attack probability floor `T_floor`.
+  The threshold may be locked so adaptive/runtime mechanisms cannot modify it. Its exact decision rule belongs to `contracts.md`.
 
-If threshold is not locked, attack-rate can tighten it until it reaches a user defined T_floor. Blocking can only get stricter, never looser.
+If the threshold is not locked, the tenant threshold attack rate can tighten it until it reaches the user-defined `T_floor`. Blocking can only get stricter, never looser.
 
 ## Controller
 
@@ -49,5 +49,5 @@ Every JEV result classified as `ATTACK` or `BENIGN` is eligible for attack-rate 
 
 ## Invariants
 
-`N` is adaptive; user security thresholds are not automatically changed. Static-analysis policy violations never enter attack-rate feedback. Sampling never overrides static blocking. `N` always remains within endpoint bounds. EWMA prevents one observation from directly determining sampling.
+`N` is adaptive; user security thresholds only ever tighten, never loosen, and only when unlocked. Static-analysis policy violations never enter attack-rate feedback. Sampling never overrides static blocking. `N` always remains within endpoint bounds. EWMA prevents one observation from directly determining sampling.
 

@@ -1,7 +1,7 @@
 import type { SamplingConfig, ThresholdConfig } from '@tessera/shared/contracts';
 import { AttackRateTracker, type AsymmetricAlpha, type Observation } from './metrics';
 import { SamplingController, type SamplingTuning } from './sampler';
-import { ThresholdController, type EffectiveThresholds, type ThresholdTuning } from './threshold';
+import { ThresholdController, type EffectiveThresholds, type JevScore, type ThresholdTuning } from './threshold';
 
 export interface AdaptiveTuning {
     alpha: AsymmetricAlpha;
@@ -39,7 +39,7 @@ export class AdaptiveControl {
         return this.thresholds.effective(config, this.rates.rates(tenantId, endpoint).tenantThreshold);
     }
 
-    classify(result: { score: number; confidence: number }, thresholds: EffectiveThresholds): 'ATTACK' | 'BENIGN' {
+    classify(result: JevScore, thresholds: EffectiveThresholds): 'ATTACK' | 'BENIGN' {
         return this.thresholds.classify(result, thresholds);
     }
 
