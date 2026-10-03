@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<?xml-stylesheet href="file:///usr/bin/../share/nmap/nmap.xsl" type="text/xsl"?>
+<!-- Nmap 7.94SVN scan initiated Sat Oct  3 17:17:49 2026 as: nmap -sV -oX nmap.xml -p 8099,22 127.0.0.1 -->
+<nmaprun scanner="nmap" args="nmap -sV -oX nmap.xml -p 8099,22 127.0.0.1" start="1791040669" startstr="Sat Oct  3 17:17:49 2026" version="7.94SVN" xmloutputversion="1.05">
+<scaninfo type="connect" protocol="tcp" numservices="2" services="22,8099"/>
+<verbose level="0"/>
+<debugging level="0"/>
+<hosthint><status state="up" reason="unknown-response" reason_ttl="0"/>
+<address addr="127.0.0.1" addrtype="ipv4"/>
+<hostnames>
+</hostnames>
+</hosthint>
+<host starttime="1791040669" endtime="1791040675"><status state="up" reason="conn-refused" reason_ttl="0"/>
+<address addr="127.0.0.1" addrtype="ipv4"/>
+<hostnames>
+<hostname name="localhost" type="PTR"/>
+</hostnames>
+<ports><port protocol="tcp" portid="22"><state state="closed" reason="conn-refused" reason_ttl="0"/><service name="ssh" method="table" conf="3"/></port>
+<port protocol="tcp" portid="8099"><state state="open" reason="syn-ack" reason_ttl="0"/><service name="http" product="SimpleHTTPServer" version="0.6" extrainfo="Python 3.12.3" method="probed" conf="10"><cpe>cpe:/a:python:simplehttpserver:0.6</cpe></service></port>
+</ports>
+<times srtt="97" rttvar="2837" to="100000"/>
+</host>
+<runstats><finished time="1791040675" timestr="Sat Oct  3 17:17:55 2026" summary="Nmap done at Sat Oct  3 17:17:55 2026; 1 IP address (1 host up) scanned in 6.14 seconds" elapsed="6.14" exit="success"/><hosts up="1" down="0" total="1"/>
+</runstats>
+</nmaprun>

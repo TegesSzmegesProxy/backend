@@ -1,0 +1,8 @@
+lynis_version=3.1.8
+os=Linux
+hardening_index=65
+warning[]=MAIL-8818|Found some information disclosure in SMTP banner (OS or software name)|-|-|
+warning[]=DBS-1828|PostgreSQL configuration file /etc/postgresql/16/main/postgresql.conf is world readable and might leak sensitive details|/etc/postgresql/16/main/postgresql.conf|Use chmod 600 to change file permissions|
+suggestion[]=BOOT-5264|Consider hardening system services|Run '/usr/bin/systemd-analyze security SERVICE' for each service|-|
+suggestion[]=KRNL-5820|If not required, consider explicit disabling of core dump in /etc/security/limits.conf file|-|-|
+suggestion[]=PROC-3612|Check the output of ps for dead or zombie processes|-|-|
