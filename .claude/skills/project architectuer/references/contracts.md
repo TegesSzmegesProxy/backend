@@ -1,6 +1,6 @@
 # Tessera Contracts
 ## Purpose
-Canonical typed contracts between Tessera components. Keep them minimal, versioned and tenant-scoped. Model prose is never a runtime contract.
+Canonical typed contracts between Tessera components. Keep them minimal, versioned and tenant-scoped. Model prose is never a runtime contract. Contracts that cross the proxy/control-plane network boundary (`ActiveBundle`, analysis upload, telemetry) are defined in `control-plane.md` and must stay backward-compatible, because deployed proxies upgrade later than the control plane.
 ## IDs
 `tenantId` identifies the protected application. `endpoint = "METHOD /path"` (e.g. `"POST /login"`, path without query string). `policyVersion` identifies the exact active policy. `analysisVersion` identifies application analysis.
 ## Normalized request
@@ -149,6 +149,6 @@ Policy is tenant-wide; endpoint and field rules are contained inside it.
 Verdict-cache identity must include at least `tenantId + endpoint + requestBodyHash` and every other request component affecting analysis. Never reuse results across tenants or incompatible policy versions.
 Request history uses `tenantId + clientIp` and stores at most 3 recent requests.
 ## Versioning
-Every active policy has an immutable version/hash. Every decision references the exact policy version used.
+Every active policy has an immutable version/hash. Every decision references the exact policy version used. The policy version equals the version of the signed bundle it was distributed in.
 ## Validation
 Validate contracts at component boundaries. Missing/invalid required fields are errors. Never infer security semantics from malformed model/tool output.

@@ -2,7 +2,9 @@
 
 ## Purpose
 
-Tessera is a multi-tenant runtime security proxy: `Client -> Nginx -> Tessera -> Application`. The protected application requires no SDK integration. Tessera analyzes HTTP requests and forwards only allowed requests.
+Tessera is a multi-tenant runtime security proxy: `Client -> Nginx -> Tessera Proxy -> Application`. The protected application requires no SDK integration. Tessera analyzes HTTP requests and forwards only allowed requests.
+
+Tessera has two deployables. The **proxy** (data plane) runs on the client's server. The **control plane** is hosted by us and holds the dashboard/admin API, analysis, policy generation, compilation and activation. A client-side **collector** uploads redacted code and environment context. See `control-plane.md` for the boundary between them.
 
 ## Stack
 
@@ -10,7 +12,7 @@ TypeScript + Express; MongoDB for persistent state; Redis for short-lived runtim
 
 ## Deployment
 
-One Tessera process can serve multiple tenants. A tenant is identified by `domain/IP + path` routing context. Each tenant has its own protected application configuration and policy.
+One proxy process can serve multiple tenants of the same customer. A tenant is identified by `domain/IP + path` routing context. Each tenant has its own protected application configuration and policy. The hosted control plane serves many customers (organizations), each owning one or more tenants.
 
 ## Supported traffic
 
@@ -77,11 +79,11 @@ Analysis runs per application release, typically from CI such as GitHub Actions.
 
 ## Control/runtime separation
 
-Code analysis, policy generation and compilation are control-plane operations. Request processing must not synchronously depend on them. Runtime uses the currently active compiled configuration.
+Code analysis, policy generation and compilation are control-plane operations running in the hosted control plane. Request processing must not synchronously depend on them or on the control plane being reachable. Runtime uses the currently active compiled configuration: a signed bundle pulled from the control plane at startup and kept locally as last known good.
 
 ## Configuration
 
-An active policy/configuration has a version/hash. Policies may be edited while Tessera is running. Each edit creates a new version that must be recompiled before it can be activated; the active version is replaced during restart/redeployment. Runtime must never mix policy versions within one decision.
+An active policy/configuration has a version/hash. Tenant runtime config (routing, upstream, failure behavior, thresholds, sampling bounds) and compiled policy are distributed together as one versioned bundle. Policies may be edited in the dashboard while the proxy is running. Each edit creates a new version that must be recompiled before it can be activated; the proxy picks up the active version when it restarts. Runtime must never mix policy versions within one decision.
 
 ## Failure behavior
 
@@ -89,9 +91,9 @@ The user configures tenant-level behavior for major failures. Relevant failures 
 
 ## Ownership
 
-`Edge = transport/forwarding`; `Normalizer = canonical request`; `Tools = deterministic evidence`; `Aggregator = static verdict`; `JEV = classification`; `Orchestration = final decision`; `Control Plane = policy/config generation`; `MongoDB = durable state`; `Redis = short-lived context`.
+`Edge = transport/forwarding`; `Normalizer = canonical request`; `Tools = deterministic evidence`; `Aggregator = static verdict`; `JEV = classification`; `Orchestration = final decision`; `Control Plane (hosted) = tenants, keys, dashboard, policy/config generation, activation, distribution`; `Collector (client-side) = source, redaction, environment tools`; `MongoDB = durable state (per deployable)`; `Redis = short-lived context`.
 
 ## Invariants
 
-Never modify requests. Never bypass static blocking through sampling. Never let JEV directly forward traffic. Never mix tenant data. Never use Redis as authoritative policy state. Never invent fail-open/fail-closed behavior where tenant configuration is required.
+Never modify requests. Never bypass static blocking through sampling. Never let JEV directly forward traffic. Never mix tenant data. Never use Redis as authoritative policy state. Never invent fail-open/fail-closed behavior where tenant configuration is required. Never let the proxy depend on control-plane availability in the request path, or execute an unverified bundle.
 

@@ -15,5 +15,11 @@
 - **Attack rate**: the share of JEV-classified requests classified as `ATTACK`, tracked per tenant and per endpoint.
 - **EWMA**: the exponentially weighted moving average used to smooth attack-rate observations.
 - **Failure behavior**: the tenant-configured behavior when Tessera, static analysis, or JEV fails.
-- **Control plane**: the admin and generation side (analysis, policy generation, compilation, approval, activation).
+- **Control plane**: the deployable hosted by us: dashboard/admin API, organizations, tenants, API keys, analysis, policy generation, compilation, approval, activation and bundle distribution.
+- **Proxy (data plane)**: the deployable on the client's server that enforces policy. It never depends on the control plane in the request path.
+- **Collector**: the client-side CI step or CLI that checks out source, redacts secrets, runs environment tools and uploads analysis context.
+- **Organization**: a customer of the hosted control plane; owns one or more tenants.
+- **Deployment key**: the API key a proxy uses to pull bundles for the tenants it is bound to.
+- **Active bundle**: the signed, versioned unit the proxy pulls: tenant runtime config plus compiled policy.
+- **Last known good**: the most recent verified bundle the proxy persisted locally, used when the control plane is unreachable.
 - **Saga**: a choreographed control-plane workflow across modules, driven by events.

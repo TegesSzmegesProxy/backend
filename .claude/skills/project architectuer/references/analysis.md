@@ -6,15 +6,17 @@ Control-plane analysis that converts an application and its environment into str
 
 ## Flow
 
-`Source -> Environment Context -> AI Analysis -> Structured Application Model -> Policy`
+`Collector (client-side): Source -> Redaction -> Environment Context -> Upload` then `Control plane (hosted): AI Analysis -> Structured Application Model -> Policy`
+
+The split exists because environment tools must see the client's network and secrets must be removed before anything leaves it, while the AI analysis and its keys live with us.
 
 ## Source
 
-Analysis accepts either `Git URL + commit` or a user-selected local project path. A source revision must be recorded for reproducibility.
+The collector accepts either `Git URL + commit` or a local project path, typically running in the client's CI. A source revision must be recorded for reproducibility and sent with the upload.
 
 ## Environment
 
-Before AI analysis, collect available environment context using security/inventory tools such as `Syft`, `Trivy` and `Nmap`. Tool choice may evolve. Results provide context; they do not directly make runtime decisions.
+Before upload, the collector gathers available environment context using security/inventory tools such as `Syft`, `Trivy` and `Nmap`, inside the client's environment. Tool choice may evolve. Results provide context; they do not directly make runtime decisions.
 
 ## AI analysis
 
@@ -39,7 +41,7 @@ Identify dependency names and versions and correlate them with available vulnera
 
 ## Configuration
 
-Analyze relevant configuration such as JSON, `.env` and framework/application config. Never send secrets or credentials to an external model; redact them while preserving useful structure.
+Analyze relevant configuration such as JSON, `.env` and framework/application config. Redaction happens in the collector, before upload: secrets and credentials never reach our control plane or the external model. Redact while preserving useful structure.
 
 ## Environment tools
 
@@ -61,9 +63,9 @@ The analysis model feeds the policy-generation process. Analysis describes the a
 
 ## Security
 
-Keep all analysis tenant-scoped. Do not expose secrets, credentials or unnecessary sensitive data to external AI APIs. Preserve source revision and analysis version for traceability.
+Keep all analysis tenant-scoped. The collector authenticates with a collector key scoped to its tenants, and the control plane derives the tenant from that key. Upload only what analysis needs, and make the uploaded scope visible to the customer. Do not expose secrets, credentials or unnecessary sensitive data to our control plane or external AI APIs. Preserve source revision and analysis version for traceability.
 
 ## Invariants
 
-Analysis never forwards, modifies or blocks requests. Analysis is reproducible from its source revision and collected context. Runtime Tessera must not synchronously depend on analysis being available.
+Analysis never forwards, modifies or blocks requests. Analysis is reproducible from its source revision and collected context. The runtime proxy must not synchronously depend on analysis or the control plane being available. Unredacted secrets never leave the client environment.
 

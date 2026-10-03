@@ -14,7 +14,7 @@ Resolve the tenant from configured domain/IP + path routing. Resolve endpoint by
 
 ## Policy
 
-Load one active policy version for the whole request. Policy defines tools and JEV context for the endpoint and each relevant field. Unknown endpoint passes through by default; this may be configurable.
+Load one active policy version for the whole request, from the in-memory snapshot built at startup from the verified bundle. The request path never calls the control plane. Policy defines tools and JEV context for the endpoint and each relevant field. Unknown endpoint passes through by default; this may be configurable.
 
 ## Normalization
 
@@ -67,9 +67,9 @@ Tenant configuration controls behavior for major failures, including Tessera/pro
 
 ## Observability
 
-Record tenant, endpoint, policy version, static verdict, sampling result, JEV classification/score/confidence when used, threshold, final decision and failure state. Never log unnecessary secrets or sensitive request contents.
+Record tenant, endpoint, policy version, static verdict, sampling result, JEV classification/score/confidence when used, threshold, final decision and failure state. Never log unnecessary secrets or sensitive request contents. Redacted summaries may be sent to the control plane as asynchronous, best-effort telemetry, never on the request path.
 
 ## Invariants
 
-Static analysis always precedes JEV. Static blocking cannot be bypassed. Unsampled requests do not invoke JEV. Tessera never modifies requests. JEV never forwards requests. One request uses one policy version. Redis is never authoritative.
+Static analysis always precedes JEV. Static blocking cannot be bypassed. Unsampled requests do not invoke JEV. Tessera never modifies requests. JEV never forwards requests. One request uses one policy version. Redis is never authoritative. The request path never depends on the control plane.
 

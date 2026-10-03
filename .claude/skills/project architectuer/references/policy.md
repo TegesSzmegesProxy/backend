@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Tenant-wide security policy defining expected application behavior and the static toolchain used at runtime. Policy generation/editing is control-plane work.
+Tenant-wide security policy defining expected application behavior and the static toolchain used at runtime. Policy generation, editing, compilation, approval and activation all run in the hosted control plane and are exposed through the dashboard. The proxy only consumes the signed, compiled result (see `control-plane.md`).
 
 ## Flow
 
-`Code Analysis + Environment + Administrator -> Policy -> Structured Policy -> Compiler -> Toolchain`
+`Code Analysis + Environment + Administrator -> Policy -> Structured Policy -> Compiler -> Toolchain -> Approval -> Activation -> Signed Bundle -> Proxy pull`
 Policy may also be imported directly in the supported structured format.
 
 ## Scope
@@ -20,7 +20,7 @@ The implementation must not depend on a specific model; examples may include Ast
 
 ## Administrator
 
-Administrators may:
+Administrators use the hosted dashboard to:
 
 * approve generated policies;
 * edit the natural-language policy;
@@ -44,7 +44,7 @@ The LLM must return structured output conforming to the defined schema; do not d
 ## Compiler
 
 The compiler transforms policy intent into a static-analysis toolchain. It infers tool selection, configuration, ordering and dependencies unless explicitly specified by the administrator.
-Compiler output may configure registered tools but must not invent unsupported tool types or executable runtime code.
+Compiler output may configure registered tools but must not invent unsupported tool types or executable runtime code. The compiler must know which tools and bundle schema versions the target proxy version supports. The proxy re-validates on its side and rejects bundles referencing tools it does not have.
 
 ## Approval
 
@@ -52,7 +52,7 @@ Policy activation is approval-gated. Approval requirements may be configurable, 
 
 ## Versioning
 
-Every activated policy has an immutable version/hash. Runtime decisions use exactly one active version. Keep human-readable policy and compiled toolchain associated with the same version.
+Every activated policy has an immutable version/hash. Runtime decisions use exactly one active version. Keep human-readable policy and compiled toolchain associated with the same version. On activation the control plane builds and signs one bundle (tenant runtime config + compiled policy) under that version. The proxy applies it on its next restart.
 
 ## Update model
 
@@ -65,5 +65,5 @@ For a new application release, code analysis may use the Git diff plus previous 
 `Compiler = toolchain derivation`
 `Toolchain = runtime static-analysis configuration`
 `Active policy = approved version`
-Never partially activate generated policy. Never replace the active policy after a failed compilation/validation.
+Never partially activate generated policy. Never replace the active policy after a failed compilation/validation. Never distribute an unsigned bundle.
 
