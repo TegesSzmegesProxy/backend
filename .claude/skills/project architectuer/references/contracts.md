@@ -47,10 +47,11 @@ Every tool defines its own input contract and receives only the information it r
 ToolResult {
  tool: string
  status: "SUCCESS" | "ERROR"
+ verdict: "SAFE" | "SUSPICIOUS" | "POLICY_VIOLATION" | "ERROR"
  evidence: unknown
 }
 ```
-A tool does not produce the final request decision.
+Each tool sets its own verdict. A tool that throws or times out returns `status: "ERROR", verdict: "ERROR"`. A tool does not produce the final request decision.
 ## Static verdict
 ```ts
 StaticVerdict {

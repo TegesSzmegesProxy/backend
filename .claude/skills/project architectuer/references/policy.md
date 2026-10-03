@@ -34,7 +34,7 @@ Code analysis may add discovered endpoints/fields automatically. The policy comp
 
 ## Natural language
 
-Natural language describes expected request/field behavior and security requirements. JEV interprets it into structured policy intent; the compiler then derives the concrete toolchain and dependencies.
+Natural language describes expected request/field behavior and security requirements. The policy-generation LLM interprets it into structured policy intent; the compiler then derives the concrete toolchain and dependencies.
 
 ## Structured policy
 

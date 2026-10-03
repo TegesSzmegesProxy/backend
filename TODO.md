@@ -8,7 +8,7 @@ No implementation exists yet. The repository contains:
 
 - `.gitignore` (Node/macOS)
 - `backend/`: a nested Git repo (`TegesSzmegesProxy/backend`) containing only `README.md`. The parent repo tracks it as a gitlink but has no `.gitmodules`, so a fresh clone of the parent gets an empty, unfetchable `backend/`.
-- `.claude/skills/*`: architecture specification (system, runtime, static analysis, policy, analysis, adaptation, operations, contracts) and development rules (modular monolith, choreographed sagas over NATS JetStream with inbox/outbox, strict TypeScript, tenant isolation).
+- `.claude/skills/*`: architecture specification (system, runtime, static analysis, policy, analysis, adaptation, operations, contracts) and development rules (modular monolith, choreographed sagas over Redis pub/sub with Mongo inbox/outbox, strict TypeScript, tenant isolation).
 
 Everything below is new work. It is ordered so that the runtime enforcement path (the proxy) works end-to-end first, using a manually imported structured policy and a stubbed JEV. The control-plane saga (analysis → generation → compilation → approval → activation) follows.
 
@@ -47,10 +47,10 @@ Conventions used in this list:
 - Acceptance criteria: `npm run build`, `npm run lint` and `npm test` (with one placeholder test) exit 0, and `npm run dev` starts both servers on their configured ports.
 
 ### [T03] [P0] [TODO] Environment configuration and local dependencies
-- Description: Validate typed config from env vars at startup (ports, Mongo URI, Redis URL, NATS URL, JEV URL/key, AI key, log dir). Fail startup on invalid config. Add `docker-compose.yml` with MongoDB, Redis, NATS (JetStream enabled) and a tiny sample upstream app for tests. Never read secrets from Mongo.
+- Description: Validate typed config from env vars at startup (ports, Mongo URI, Redis URL, JEV URL/key, AI key, log dir). Fail startup on invalid config. Add `docker-compose.yml` with MongoDB, Redis and a tiny sample upstream app for tests. Never read secrets from Mongo.
 - Files/modules: `backend/src/config.ts`, `backend/docker-compose.yml`, `backend/.env.example`
 - Depends on: T02
-- Acceptance criteria: Starting with a missing required var exits non-zero with a message naming the var. `docker compose up` brings up all 4 services, and Tessera connects to Mongo/Redis/NATS on startup.
+- Acceptance criteria: Starting with a missing required var exits non-zero with a message naming the var. `docker compose up` brings up all 3 services, and Tessera connects to Mongo/Redis on startup.
 
 ### [T04] [P0] [TODO] Shared contracts with runtime validation
 - Description: Implement the `contract.md` types (`NormalizedRequest`, `RequestField`, `RequestFile`, `ToolResult`, `StaticVerdict`, `JevInput`, `JevResult`, `Decision`, `SamplingConfig`, `AdaptiveState`, `Policy`, `EndpointPolicy`, `FieldPolicy`, `ToolConfig`) as Zod schemas with inferred TS types. Each type is owned by its module and exported through the module's public API, not a global dump.
@@ -172,8 +172,8 @@ Conventions used in this list:
 - Depends on: T22, T17
 - Acceptance criteria: Tests show that N stays within bounds for EWMA 0 and 1, that a higher endpoint EWMA gives higher N than the same tenant EWMA, and that thresholds are unchanged after 1000 updates.
 
-### [T24] [P1] [TODO] Event infrastructure: envelope, outbox, inbox on NATS JetStream
-- Description: Versioned event envelope `{eventId, eventType, version, tenantId, aggregateId, occurredAt, payload}`. A Mongo outbox is written in the same local transaction as the state change, and a relay publishes it to JetStream. A Mongo inbox (`consumer + eventId` unique) makes handlers idempotent. Failed handlers retry, then emit an explicit failure event.
+### [T24] [P1] [TODO] Event infrastructure: envelope, outbox, inbox on Redis pub/sub
+- Description: Versioned event envelope `{eventId, eventType, version, tenantId, aggregateId, occurredAt, payload}`. A Mongo outbox is written in the same local transaction as the state change, and a relay publishes it to a Redis pub/sub channel (`source/shared/broker`). Pub/sub is at-most-once, so it is only a delivery hint: the outbox stays the source of truth and the relay re-publishes entries that have no matching inbox record after a timeout. A Mongo inbox (`consumer + eventId` unique) makes handlers idempotent. Failed handlers retry, then emit an explicit failure event.
 - Files/modules: `backend/src/modules/events/`
 - Depends on: T03
 - Acceptance criteria: Tests show that delivering the same event twice runs the handler's side effect once, that a crash between commit and publish still publishes after restart (outbox relay), and that an event without `tenantId` is rejected.

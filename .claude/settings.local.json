@@ -8,7 +8,8 @@
       "Read(//home/antek/**)",
       "Read(//home/antek/.claude/**)",
       "Bash(python3 -)",
-      "Bash(rm \"architecture.md\")"
+      "Bash(rm \"architecture.md\")",
+      "Bash(npx tsc *)"
     ]
   }
 }

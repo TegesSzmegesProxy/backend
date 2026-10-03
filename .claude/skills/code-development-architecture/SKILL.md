@@ -56,7 +56,7 @@ Sagas apply only to control-plane workflows (analysis, policy generation, compil
 
 ## Saga rules
 
-Every saga step must be independently retryable and idempotent. Use a Mongo-backed inbox (unique `consumer + eventId`) for idempotency and a Mongo outbox for publication. Do not use NATS JetStream or any other external message broker.
+Every saga step must be independently retryable and idempotent. Use a Mongo-backed inbox (unique `consumer + eventId`) for idempotency and a Mongo outbox for publication. Events are delivered over Redis pub/sub, which is at-most-once: treat it as a delivery hint, with the outbox as the source of truth and redelivery of unacknowledged events. Do not use NATS JetStream or any other external message broker.
 Persist enough state to determine whether an event was already processed.
 Do not assume event delivery is exactly-once.
 Handlers must tolerate duplicate, delayed, and out-of-order events where the workflow permits it.
@@ -107,6 +107,14 @@ Distinguish:
 Test only most important part of modules. 
 For saga steps, test duplicate delivery and partial failure.
 For request-path code, test final `ALLOW/BLOCK` behavior and tenant isolation.
+
+## Modules are classes
+
+Implement each module as a class that owns its state (connections, caches, config) and exposes its public API as methods.
+Do not use module-level mutable state or loose exported functions as a module's interface.
+Take dependencies and configuration through the constructor, so instances are testable and tenant/config scoped.
+Keep internal helpers `private`; export only the class (and its public types) from the module's `index.ts`.
+Pure stateless helpers may stay plain functions.
 
 ## Code organization
 
