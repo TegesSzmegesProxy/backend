@@ -9,7 +9,7 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
-            include: ['src/**/*.ts'],
+            include: ['source/**/*.ts'],
             exclude: ['**/*.test.ts', '**/index.ts'],
         },
     },
@@ -17,7 +17,7 @@ export default defineConfig({
         alias: [
             {
                 find: /^@tessera\/(.+)$/,
-                replacement: resolve(__dirname, './src/$1/index.ts'),
+                replacement: resolve(__dirname, './source/$1/index.ts'),
             },
         ],
     },
