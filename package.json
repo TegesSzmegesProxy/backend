@@ -15,8 +15,9 @@
   "type": "commonjs",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon --exec tsx ./source/bootstrap.ts"
+  }, 
   "dependencies": {
     "@eslint/js": "^9.39.5",
     "@fastify/env": "^7.0.0",
@@ -24,10 +25,11 @@
     "fastify": "^5.12.5",
     "redis": "^6.3.0",
     "typescript-eslint": "^8.71.0",
-    "vitest": "^3.2.7"
+    "vitest": "^5.0.3"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
+    "nodemon": "^1.14.10",
     "tsx": "^4.23.15"
   }
 }

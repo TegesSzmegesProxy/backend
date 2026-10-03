@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyEnv from "@fastify/env";
 import { Broker } from "../../shared/broker";
@@ -21,7 +22,7 @@ class IngressServer {
           PORT: { type: "string", default: "62197" },
         },
       },
-      dotenv: true,
+      dotenv: { path: resolve(process.cwd(), "source/.env") },
     });
     const env = this.app.getEnvs<Env>();
 
