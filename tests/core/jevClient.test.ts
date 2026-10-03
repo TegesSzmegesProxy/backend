@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { decode } from '@toon-format/toon';
-import { JevClient, type JevModel } from '../../source/core/jev/client';
+import { JevClient, type JevModel, type VerdictStore } from '../../source/core/jev/client';
 import type { StaticVerdict } from '../../source/core/static-analysis/aggregator';
 import type { NormalizedRequest } from '../../source/shared/contracts';
 
@@ -36,6 +36,8 @@ function fakeModel(noul: number, severity = 1) {
     return { model: { systemOne } as unknown as JevModel, systemOne };
 }
 
+const noCache: VerdictStore = { get: async () => null, set: async () => {} };
+
 const sentState = (systemOne: ReturnType<typeof fakeModel>['systemOne']) =>
     decode((systemOne.mock.calls[0] as unknown as [{ state: string }])[0].state) as Record<string, unknown>;
 
@@ -43,7 +45,7 @@ describe('JevClient', () => {
     it('sends only the endpoint, fields and field-attributed pattern matches', async () => {
         const { model, systemOne } = fakeModel(0.1);
 
-        await new JevClient(model).createVerdict(request, suspicious);
+        await new JevClient(model, noCache).createVerdict(request, suspicious);
 
         const state = sentState(systemOne);
         expect(state).toMatchObject({
@@ -63,7 +65,7 @@ describe('JevClient', () => {
     it('sends no pattern matches when static analysis found none', async () => {
         const { model, systemOne } = fakeModel(0.1);
 
-        await new JevClient(model).createVerdict(request, { verdict: 'SAFE', results: [], evidence: undefined });
+        await new JevClient(model, noCache).createVerdict(request, { verdict: 'SAFE', results: [], evidence: undefined });
 
         expect(sentState(systemOne)).not.toHaveProperty('patternMatches');
     });
@@ -71,7 +73,7 @@ describe('JevClient', () => {
     it('uses P(attack) as the attack probability and its decisiveness as confidence', async () => {
         const { model } = fakeModel(0.9, 2.4);
 
-        const verdict = await new JevClient(model).createVerdict(request, suspicious);
+        const verdict = await new JevClient(model, noCache).createVerdict(request, suspicious);
 
         expect(verdict.score).toBe(2.4);
         expect(verdict.attackProbability).toBe(0.9);
@@ -81,6 +83,6 @@ describe('JevClient', () => {
     it.each([NaN, -0.1, 1.2, undefined as unknown as number])('rejects an attack probability of %s', async noul => {
         const { model } = fakeModel(noul);
 
-        await expect(new JevClient(model).createVerdict(request, suspicious)).rejects.toThrow(RangeError);
+        await expect(new JevClient(model, noCache).createVerdict(request, suspicious)).rejects.toThrow(RangeError);
     });
 });

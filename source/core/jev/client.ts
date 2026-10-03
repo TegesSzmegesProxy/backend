@@ -3,7 +3,6 @@ import { TypeSafeClient } from '@typesafe-ai/sdk';
 import { encode } from '@toon-format/toon';
 import { StaticVerdict } from '../static-analysis/aggregator';
 import { JEV_ATTACK_QUESTION, JEV_SEVERITY_QUESTION } from './prompt';
-import { TenantRedis } from '@tessera/shared/storage';
 import { Normalizer } from '@tessera/edge/normalizer';
 
 export interface DynamicVerdict {
@@ -18,6 +17,12 @@ export interface DynamicVerdict {
 /** The part of the TypeSafe SDK JEV uses, so tests can pass a fake. */
 export type JevModel = Pick<TypeSafeClient, 'systemOne'>;
 
+/** Where verdicts are cached; in production a tenant-scoped `TenantRedis` namespace. */
+export interface VerdictStore {
+    get(key: string): Promise<string | null>;
+    set(key: string, value: string, ttlSeconds?: number): Promise<void>;
+}
+
 /** Only what JEV needs to judge the request. Identifiers, IPs, headers and static verdict words are left out. */
 interface JevState {
     endpoint: string;
@@ -30,22 +35,21 @@ interface JevState {
 const PATTERN_MATCH_NOTE = 'Keyword/regex pre-filter. Matches are frequent on ordinary text and are not findings.';
 
 export class JevClient {
-    private redis: TenantRedis;
-    
-    constructor(private readonly model: JevModel, redis: TenantRedis) {
-        this.redis = redis.sub('jev-verdict-cache');
-    }
+    constructor(
+        private readonly model: JevModel,
+        private readonly cache: VerdictStore
+    ) {}
 
     private getRequestKey(request: NormalizedRequest) {
         return `${request.endpoint}:${Normalizer.hashRequestBody(request.body)}`;
     }
 
     private storeVerdict(request: NormalizedRequest, verdict: DynamicVerdict) {
-        this.redis.set(this.getRequestKey(request), JSON.stringify(verdict), 60 * 60 * 24);
+        this.cache.set(this.getRequestKey(request), JSON.stringify(verdict), 60 * 60 * 24);
     }
 
     private async checkVerdict(request: NormalizedRequest): Promise<DynamicVerdict | undefined> {
-        const verdict = await this.redis.get(this.getRequestKey(request));
+        const verdict = await this.cache.get(this.getRequestKey(request));
         if (verdict === null) return undefined;
 
         const json = JSON.parse(verdict);

@@ -1,11 +1,10 @@
 import { createClient } from "redis";
-import { redisUrl } from "../../config";
 import { TenantRedis } from "./tenant-redis";
 
 type RedisClient = ReturnType<typeof createClient>;
 
 type RedisStorageOptions = {
-  url?: string;
+  url: string;
 };
 
 class RedisStorage {
@@ -13,7 +12,7 @@ class RedisStorage {
   private readonly client: RedisClient;
   private connecting: Promise<unknown> | undefined;
 
-  constructor({ url = redisUrl() }: RedisStorageOptions = {}) {
+  constructor({ url }: RedisStorageOptions) {
     // Fail fast while disconnected so callers recompute instead of hanging on a queued command.
     this.client = createClient({ url, disableOfflineQueue: true });
     // An unhandled "error" event would crash the process; node-redis reconnects by itself.

@@ -1,120 +1,83 @@
-import { resolve } from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
-import fastifyEnv from "@fastify/env";
 import replyFrom from "@fastify/reply-from";
-import { Broker } from "../../shared/broker";
-import { Normalizer } from "../normalizer";
-import { Runner } from "@tessera/core/static-analysis/runner";
-import StringLength from "@tessera/core/static-analysis/tools/schema/stringLength";
-import { Tool } from "@tessera/core/static-analysis/shared";
-import { Aggregator } from "@tessera/core/static-analysis/aggregator";
-import { JevClient } from "@tessera/core/jev/client";
-import { TypeSafeClient } from "@typesafe-ai/sdk";
-import { DecisionOrchestrator } from "@tessera/core/decisionOrchestrator";
-import { Sampler } from "@tessera/core/sampling";
-import { AdaptiveControl } from "@tessera/feedback";
-import SqlInjection from "@tessera/core/static-analysis/tools/injection/sqlinjection";
-import CommandInjection from "@tessera/core/static-analysis/tools/injection/commandinjection";
-import Xss from "@tessera/core/static-analysis/tools/injection/xss";
-import { TenantRedis } from '@tessera/shared/storage';
-import { requestsCacheSize } from '@tessera/shared/config';
+import type { Normalizer } from "../normalizer";
+import type { ExecutionPlan, Runner } from "@tessera/core/static-analysis/runner";
+import type { Aggregator } from "@tessera/core/static-analysis/aggregator";
+import type { DecisionOrchestrator } from "@tessera/core/decisionOrchestrator";
 import type { NormalizedRequest } from '@tessera/shared/contracts';
 
 const REQUESTS_CACHE_TTL_SECONDS = 60 * 60;
 
-type Env = {
-  REDIS_URL: string;
-  PORT: string;
-  TENANT_ID: string;
-  UPSTREAM_URL: string;
-};
+/** Where the latest requests per client IP are kept; in production a tenant-scoped `TenantRedis` namespace. */
+interface RecentRequestStore {
+  pushRecent(key: string, value: string, max: number, ttlSeconds: number): Promise<void>;
+}
+
+interface IngressDependencies {
+  normalizer: Normalizer;
+  runner: Runner;
+  aggregator: Aggregator;
+  orchestrator: DecisionOrchestrator;
+  /** The static-analysis plan for a request; comes from the active policy. */
+  planFor(request: NormalizedRequest): ExecutionPlan;
+  recentRequests: RecentRequestStore;
+}
+
+interface IngressConfig {
+  tenantId: string;
+  port: number;
+  host?: string;
+  upstreamUrl: string;
+  /** How many recent requests to keep per client IP; 0 disables the cache. */
+  requestsCacheSize: number;
+}
 
 class IngressServer {
   private readonly app: FastifyInstance = Fastify();
-  private broker: Broker | undefined;
-  private runner =  new Runner()
-  private aggregator = new Aggregator()
-  private requestRedis: TenantRedis;
-  private readonly requestsCacheSize = requestsCacheSize();
-  constructor(private readonly redis: TenantRedis, private readonly normalizer: Normalizer = new Normalizer()) {
-    this.requestRedis = redis.sub('ingress-requests-cache');
-  }
-  // Placeholder values until per-tenant runtime config arrives with the policy bundle (TODO T04/T20/T31/T35).
-  // N is a probability (0-1); thresholds are on the JEV attack probability (0-1) and tighten toward the floor under attack.
-  private orchestrator = new DecisionOrchestrator(
-    {
-      jev: new JevClient(new TypeSafeClient({}), this.redis),
-      adaptive: new AdaptiveControl(),
-      sampler: new Sampler(),
-      configFor: () => ({
-        sampling: { probabilityN: 0.1, minN: 0.01, maxN: 1 },
-        threshold: { attackProbabilityThreshold: 0.7, attackProbabilityFloor: 0.5, locked: false },
-      }),
-    },
-    {
-      staticAnalysisError: "BLOCK",
-      suspiciousWhenJevUnavailable: "BLOCK",
-      sampledWhenJevUnavailable: "ALLOW",
-    }
-  )
+
+  constructor(
+    private readonly deps: IngressDependencies,
+    private readonly config: IngressConfig,
+  ) {}
+
   async start(): Promise<void> {
-    await this.app.register(fastifyEnv, {
-      schema: {
-        type: "object",
-        required: ["REDIS_URL", "UPSTREAM_URL"],
-        properties: {
-          REDIS_URL: { type: "string" },
-          UPSTREAM_URL: { type: "string" },
-          PORT: { type: "string", default: "62197" },
-          TENANT_ID: { type: "string", default: "default" },
-        },
-      },
-      dotenv: { path: resolve(process.cwd(), "source/.env") },
-    });
-    const env = this.app.getEnvs<Env>();
-    
-    this.broker = new Broker({ url: env.REDIS_URL });
-    await this.broker.connect();
-
-    await this.app.register(replyFrom, { base: env.UPSTREAM_URL });
-
-    this.registerRoutes(env.TENANT_ID);
-
-    await this.app.listen({ port: Number(env.PORT), host: "0.0.0.0" });
+    await this.app.register(replyFrom, { base: this.config.upstreamUrl });
+    this.registerRoutes();
+    await this.app.listen({ port: this.config.port, host: this.config.host ?? "0.0.0.0" });
   }
 
-  private registerRoutes(tenantId: string): void {
+  private registerRoutes(): void {
     this.app.route({
       method: ["GET", "POST", "PUT", "PATCH", "DELETE"],
       url: "/*",
       handler: async (request, reply) => {
-        const normalized = this.normalizer.normalize(request, tenantId); 
+        const { normalizer, runner, aggregator, orchestrator, planFor } = this.deps;
+        const normalized = normalizer.normalize(request, this.config.tenantId);
         this.cacheRequest(normalized);
-        const toolResult =  this.runner.run(normalized, [{tool: new Xss(), target: "login"}, {tool: new SqlInjection(), target: "login"}] )
-        let staticResult = this.aggregator.aggregate(toolResult)
-        const decision = await this.orchestrator.orchestrate(normalized, staticResult)
+        const staticResult = aggregator.aggregate(runner.run(normalized, planFor(normalized)));
+        const decision = await orchestrator.orchestrate(normalized, staticResult);
 
         if (decision.action === "BLOCK") {
-          return reply.code(403).send({ requestId: normalized.requestId })
+          return reply.code(403).send({ requestId: normalized.requestId });
         }
-        return reply.from(request.raw.url ?? "/")
+        return reply.from(request.raw.url ?? "/");
       },
-        
     });
   }
 
   // Fire-and-forget: Redis is non-authoritative, so a failed write must not delay or fail the request.
   private cacheRequest(request: NormalizedRequest): void {
-    if (this.requestsCacheSize === 0) return;
-    this.requestRedis
-      .pushRecent(request.clientIp, JSON.stringify(request), this.requestsCacheSize, REQUESTS_CACHE_TTL_SECONDS)
+    const max = this.config.requestsCacheSize;
+    if (max === 0) return;
+    this.deps.recentRequests
+      .pushRecent(request.clientIp, JSON.stringify(request), max, REQUESTS_CACHE_TTL_SECONDS)
       .catch((error) => console.warn("[ingress] failed to cache request:", error));
   }
 
   async stop(): Promise<void> {
     await this.app.close();
-    await this.broker?.disconnect();
   }
 }
 
 export { IngressServer };
+export type { IngressConfig, IngressDependencies, RecentRequestStore };
