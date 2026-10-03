@@ -1,2 +1,1 @@
-export {
-}
+export { Sampler } from './Sampler';
