@@ -1,2 +1,1 @@
-export {
-}
+export { IngressServer } from "./ingress";

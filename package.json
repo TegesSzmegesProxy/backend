@@ -19,7 +19,9 @@
   },
   "dependencies": {
     "@eslint/js": "^9.39.5",
+    "@fastify/env": "^7.0.0",
     "eslint-config-prettier": "^10.1.8",
+    "fastify": "^5.12.5",
     "redis": "^6.3.0",
     "typescript-eslint": "^8.71.0",
     "vitest": "^3.2.7"
