@@ -1,3 +1,10 @@
-export { BundleManager } from "./BundleManager";
+export { ActivePolicy } from "./ActivePolicy";
+export { BundleFetcher, BundleVerificationError } from "./BundleFetcher";
 export { PolicySnapshot } from "./PolicySnapshot";
-export type { BundleSource } from "./BundleManager";
+export { PoliciesNotFetchedError, PolicyStore } from "./PolicyStore";
+export { PolicyWatcher } from "./PolicyWatcher";
+export type { BundleSource, PolicyStatus, PolicyStatusSource } from "./ActivePolicy";
+export type { BundleFetcherOptions } from "./BundleFetcher";
+export type { PolicyContext, ResolvedPolicy } from "./PolicySnapshot";
+export { fetchPolicies } from "./fetchPolicies";
+export type { FetchPoliciesResult } from "./fetchPolicies";

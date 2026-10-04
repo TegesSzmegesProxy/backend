@@ -2,7 +2,8 @@
 
 ## Status
 
-Accepted, 2026-10-04.
+Superseded by ADR-0002: the proxy now starts only from a bundle `tessera fetch`
+stored in Redis, and never pulls one at startup.
 
 ## Context
 

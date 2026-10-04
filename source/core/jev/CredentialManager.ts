@@ -1,6 +1,7 @@
 import { TypeSafeClient } from "@typesafe-ai/sdk";
 import type { NormalizedRequest } from "../../shared/contracts";
 import type { StaticVerdict } from "../static-analysis/aggregator";
+import type { PolicyContext } from "../policy/PolicySnapshot";
 import { JevClient, type DynamicVerdict, type VerdictStore } from "./client";
 import { jevCredentialSchema } from "../../shared/contracts/operations";
 
@@ -33,8 +34,8 @@ export class CredentialManager {
     }
   }
 
-  createVerdict(request: NormalizedRequest, staticAnalysis: StaticVerdict): Promise<DynamicVerdict> {
+  createVerdict(request: NormalizedRequest, staticAnalysis: StaticVerdict, context?: PolicyContext): Promise<DynamicVerdict> {
     if (!this.client) return Promise.reject(new Error("JEV credential unavailable"));
-    return this.client.createVerdict(request, staticAnalysis);
+    return this.client.createVerdict(request, staticAnalysis, context);
   }
 }

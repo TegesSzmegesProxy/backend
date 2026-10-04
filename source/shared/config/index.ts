@@ -16,14 +16,13 @@ const envSchema = z.object({
   }),
   DEPLOYMENT_API_KEY: z.string().min(1),
   BUNDLE_PUBLIC_KEY: z.string().min(1),
-  BUNDLE_CACHE_FILE: z.string().min(1),
   PORT: optional(z.coerce.number().int().min(0).max(65535).default(62197)),
 });
 
 interface ProxyConfig {
   tenantId: string;
   redisUrl: string;
-  dashboard: { url: string; apiKey: string; publicKey: string; cacheFile: string };
+  dashboard: { url: string; apiKey: string; publicKey: string };
   ingress: { port: number };
 }
 
@@ -44,7 +43,7 @@ function loadConfig(envFile: string = resolve(process.cwd(), ".env")): ProxyConf
   return {
     tenantId: assertTenantId(env.TENANT_ID),
     redisUrl: env.REDIS_URL,
-    dashboard: { url: env.DASHBOARD_API_URL, apiKey: env.DEPLOYMENT_API_KEY, publicKey: env.BUNDLE_PUBLIC_KEY, cacheFile: env.BUNDLE_CACHE_FILE },
+    dashboard: { url: env.DASHBOARD_API_URL, apiKey: env.DEPLOYMENT_API_KEY, publicKey: env.BUNDLE_PUBLIC_KEY },
     ingress: { port: env.PORT },
   };
 }

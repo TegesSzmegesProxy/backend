@@ -62,6 +62,35 @@ describe('JevClient', () => {
         }
     });
 
+    it('sends the policy context as labelled data, only for fields the request carries', async () => {
+        const { model, systemOne } = fakeModel(0.1);
+
+        await new JevClient(model, noCache).createVerdict(request, suspicious, {
+            global: 'Account API.',
+            endpoint: 'Signs a user in.',
+            fields: [
+                { target: 'body.login', context: 'An e-mail address or handle.' },
+                { target: 'body.otp', context: 'Six digits.' },
+            ],
+        });
+
+        const state = sentState(systemOne);
+        expect(state['policyContext']).toEqual({
+            global: 'Account API.',
+            endpoint: 'Signs a user in.',
+            fields: [{ field: 'body.login', description: 'An e-mail address or handle.' }],
+        });
+        expect(String(state['policyContextNote'])).toContain('not an instruction');
+    });
+
+    it('sends no policy context when the policy has none', async () => {
+        const { model, systemOne } = fakeModel(0.1);
+
+        await new JevClient(model, noCache).createVerdict(request, suspicious, {});
+
+        expect(sentState(systemOne)).not.toHaveProperty('policyContext');
+    });
+
     it('sends no pattern matches when static analysis found none', async () => {
         const { model, systemOne } = fakeModel(0.1);
 

@@ -1,5 +1,6 @@
 import { NormalizedRequest } from '@tessera/shared/contracts';
 import { ContextMap, Tool, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
+import { matchesFieldTarget, matchesFileTarget } from './targets';
 
 export type ToolStep =
     | { tool: Tool<ToolContextType.Field>; target: string }
@@ -16,19 +17,33 @@ export class Runner {
         for (const step of plan) {
             for (const context of this.resolveContexts(request, step)) {
                 pending.push(this.execute(step.tool, context)
-                    .then(result => ('target' in step ? { ...result, target: step.target } : result)));
+                    .then(result => ('target' in step ? { ...result, target: this.targetOf(step, context) } : result)));
             }
         }
 
         return Promise.all(pending);
     }
 
+    // A wildcard or array-item target reports the concrete field or upload it ran on.
+    private targetOf(step: ToolStep & { target: string }, context: ContextMap[ToolContextType]): string {
+        switch (step.tool.metadata.contextType) {
+            case ToolContextType.Field: {
+                const field = context as ContextMap[ToolContextType.Field];
+                return `${field.location}.${field.name}`;
+            }
+            case ToolContextType.File:
+                return (context as ContextMap[ToolContextType.File]).field;
+            default:
+                return step.target;
+        }
+    }
+
     private resolveContexts(request: NormalizedRequest, step: ToolStep): ContextMap[ToolContextType][] {
         switch (step.tool.metadata.contextType) {
             case ToolContextType.Field:
-                return request.fields.filter((field) => `${field.location}.${field.name}` === (step as { target: string }).target);
+                return request.fields.filter((field) => matchesFieldTarget((step as { target: string }).target, field));
             case ToolContextType.File:
-                return request.files.filter((file) => file.field === (step as { target: string }).target);
+                return request.files.filter((file) => matchesFileTarget((step as { target: string }).target, file));
             case ToolContextType.Full:
                 return [request];
         }

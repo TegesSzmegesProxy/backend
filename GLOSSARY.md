@@ -6,7 +6,7 @@
 - **Normalized request**: the canonical, parsed form of a raw request used by analysis.
 - **Tool**: a deterministic check (schema, resource, injection, url, file-magic) that produces a tool result.
 - **Tool contract**: a tool's id, metadata and configuration schema, shared by the proxy and the control plane. A policy configures a tool only through its contract.
-- **Tool registry**: the versioned set of tool contracts the proxy executes (`tessera.tools/v2`), published as `docs/tool-registry.json`.
+- **Tool registry**: the versioned set of tool contracts the proxy executes (`tessera.tools/v3`), published as `docs/tool-registry.json`.
 - **Static verdict**: the aggregated result of all tools: `SAFE`, `SUSPICIOUS`, `POLICY_VIOLATION`, or `ERROR`.
 - **Sampling (N)**: the percentage of `SAFE` requests sent to JEV.
 - **Threshold (T)**: the tenant-set threshold applied to the JEV attack probability, with a floor (`T_floor`) it may tighten to under attack. Independent of N.
@@ -25,6 +25,8 @@
 - **Collector**: the client-side CI step or CLI that checks out source, redacts secrets, runs environment tools and uploads analysis context.
 - **Organization**: a customer of the hosted control plane; owns one or more tenants.
 - **Deployment key**: the API key a proxy uses to pull bundles for the tenants it is bound to.
-- **Active bundle**: the signed, versioned unit the proxy pulls: tenant runtime config plus compiled policy.
-- **Last known good**: the most recent verified bundle the proxy persisted locally, used when the control plane is unreachable.
+- **Active bundle**: the signed, versioned unit the dashboard distributes: tenant runtime config plus compiled policy.
+- **Policy scope**: where a step of a `tessera.policy/v3` bundle runs: `global` and `environment` on every request, an endpoint on its own requests. The most specific scope wins for the same tool and target.
+- **Policy fetch**: `tessera fetch`, the only way the proxy obtains a bundle: pull, verify, build every tool, store in Redis.
+- **Last known good**: the most recent bundle `tessera fetch` verified and stored in Redis; the proxy runs it when the control plane is unreachable, and a failed fetch never replaces it.
 - **Saga**: a choreographed control-plane workflow across modules, driven by events.

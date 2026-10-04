@@ -1,6 +1,7 @@
 import type { NormalizedRequest, SamplingConfig, ThresholdConfig } from "@tessera/shared/contracts";
 import type { StaticVerdict } from "@tessera/core/static-analysis/aggregator";
 import type { DynamicVerdict } from "@tessera/core/jev/client";
+import type { PolicyContext } from "@tessera/core/policy/PolicySnapshot";
 import { InvalidJevResultError } from "@tessera/feedback";
 import type { EffectiveThresholds, Observation } from "@tessera/feedback";
 
@@ -25,7 +26,7 @@ export interface Decision {
 
 /** The only part of the JEV client the orchestrator depends on. */
 export interface Jev {
-    createVerdict(request: NormalizedRequest, staticAnalysis: StaticVerdict): Promise<DynamicVerdict>;
+    createVerdict(request: NormalizedRequest, staticAnalysis: StaticVerdict, context?: PolicyContext): Promise<DynamicVerdict>;
 }
 
 /** Adaptive N, effective thresholds and attack-rate feedback; implemented by `AdaptiveControl`. */
@@ -66,10 +67,16 @@ type JevSubject = "suspicious" | "sampled";
 export class DecisionOrchestrator {
     constructor(
         private readonly deps: DecisionDependencies,
-        private readonly config: DecisionConfig
+        /** A function when the configuration can change while running (a fetched policy was applied). */
+        private readonly decisionConfig: DecisionConfig | (() => DecisionConfig)
     ) {}
 
-    async orchestrate(request: NormalizedRequest, staticVerdict: StaticVerdict): Promise<Decision> {
+    private get config(): DecisionConfig {
+        return typeof this.decisionConfig === "function" ? this.decisionConfig() : this.decisionConfig;
+    }
+
+    /** `context` is the policy's description of legitimate traffic, handed to JEV as data. */
+    async orchestrate(request: NormalizedRequest, staticVerdict: StaticVerdict, context?: PolicyContext): Promise<Decision> {
         switch (staticVerdict.verdict) {
             case "POLICY_VIOLATION":
                 return { action: "BLOCK", reason: "static policy violation", staticVerdict, sampled: false };
@@ -81,7 +88,7 @@ export class DecisionOrchestrator {
                     sampled: false,
                 };
             case "SUSPICIOUS":
-                return this.classify(request, staticVerdict, "suspicious", false);
+                return this.classify(request, staticVerdict, "suspicious", false, context);
             case "SAFE": {
                 const { tenantId, endpoint } = request;
                 const n = this.deps.adaptive.samplingProbability(tenantId, endpoint, this.deps.configFor(tenantId, endpoint).sampling);
@@ -90,7 +97,7 @@ export class DecisionOrchestrator {
                     this.deps.adaptive.observe(tenantId, endpoint, "UNSAMPLED");
                     return { action: "ALLOW", reason: "static analysis safe, not sampled", staticVerdict, sampled: false };
                 }
-                return this.classify(request, staticVerdict, "sampled", true);
+                return this.classify(request, staticVerdict, "sampled", true, context);
             }
         }
     }
@@ -99,11 +106,12 @@ export class DecisionOrchestrator {
         request: NormalizedRequest,
         staticVerdict: StaticVerdict,
         subject: JevSubject,
-        sampled: boolean
+        sampled: boolean,
+        context?: PolicyContext
     ): Promise<Decision> {
         let jev: DynamicVerdict;
         try {
-            jev = await this.deps.jev.createVerdict(request, staticVerdict);
+            jev = await this.deps.jev.createVerdict(request, staticVerdict, context);
         } catch {
             return this.jevFailed(subject, "JEV unavailable", staticVerdict, sampled);
         }

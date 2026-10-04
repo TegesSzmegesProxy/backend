@@ -27,6 +27,10 @@ import {
   ExecFileRunner,
   type EnvironmentTool,
 } from "../../source/core/environment-analysis";
+import { BundleFetcher, BundleVerificationError, fetchPolicies, PolicySnapshot, PolicyStore } from "../../source/core/policy";
+import { loadConfig } from "../../source/shared/config";
+import { BundleVerifier } from "../../source/shared/contracts";
+import { RedisStorage } from "../../source/shared/storage";
 
 const repoRoot = resolve(__dirname, "..", "..");
 const bootstrapPath = resolve(repoRoot, "source", "bootstrap.ts");
@@ -60,6 +64,14 @@ function checked<T>(source: string, parse: (value: string) => T, value: string):
     if (error instanceof InputError) fail(`${source}: ${error.message}`);
     throw error;
   }
+}
+
+/** The proxy's TENANT_ID: the project's id in the control plane. */
+function parseProxyTenant(value: string): string {
+  if (!/^[a-f0-9]{24}$/.test(value)) {
+    throw new InvalidArgumentError("must be the project's 24-character lowercase hex id");
+  }
+  return value;
 }
 
 /** Starts the proxy for one tenant and mirrors the child's exit. */
@@ -295,6 +307,65 @@ async function responseMessage(response: Response): Promise<string> {
   }
 }
 
+const REDIS_TIMEOUT_MS = 5_000;
+
+/**
+ * `tessera fetch`: pulls the project's active policies from the dashboard, verifies them, builds every tool they name
+ * and stores them in Redis, where the proxy reads them at startup and a running proxy picks them up. Nothing is stored
+ * unless every check passes; the policies already in Redis stay active.
+ */
+async function runFetch(options: { force?: boolean }): Promise<void> {
+  // The proxy's own configuration (REDIS_URL, TENANT_ID, DASHBOARD_API_URL, DEPLOYMENT_API_KEY, BUNDLE_PUBLIC_KEY), from the same .env files.
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined && process.env[key] === undefined) process.env[key] = value;
+  }
+  let config: ReturnType<typeof loadConfig>;
+  try {
+    config = loadConfig(resolve(repoRoot, ".env"));
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
+  const verifier = new BundleVerifier(config.dashboard.publicKey, config.tenantId);
+  const redis = new RedisStorage({ url: config.redisUrl });
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      redis.connect(),
+      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("timed out")), REDIS_TIMEOUT_MS); }),
+    ]);
+  } catch (error) {
+    fail(`cannot connect to Redis at REDIS_URL (${error instanceof Error ? error.message : error})`);
+  } finally { clearTimeout(timer); }
+
+  try {
+    const result = await fetchPolicies({
+      fetcher: new BundleFetcher({ tenantId: config.tenantId, apiBaseUrl: config.dashboard.url, deploymentKey: config.dashboard.apiKey }, verifier),
+      store: new PolicyStore(redis.tenant(config.tenantId).sub("policy")),
+      compile: (bundle) => new PolicySnapshot(bundle, (tenantId) => redis.tenant(tenantId)),
+      force: options.force,
+    });
+    const summary = result.summary
+      ? ` (${result.summary.global} global, ${result.summary.environment} environment, ${result.summary.endpointSteps} endpoint steps on ${result.summary.endpoints} endpoints)`
+      : "";
+    if (result.status === "unchanged") {
+      console.error(`Tessera: policies are up to date; Redis holds the active version ${result.version}${summary}`);
+    } else {
+      console.error(`Tessera: stored policy ${result.version}${summary} for project ${config.tenantId}`);
+      console.error(result.previousVersion
+        ? `Tessera: replaced ${result.previousVersion}; running proxies switch to it within 30 seconds`
+        : "Tessera: the proxy can start now");
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const hint = error instanceof BundleVerificationError
+      ? "; check BUNDLE_PUBLIC_KEY and TENANT_ID"
+      : /returned 404/.test(message) ? "; activate a policy for this project in the dashboard first" : "";
+    fail(`fetch failed, Redis was not changed: ${message}${hint}`);
+  } finally {
+    await redis.disconnect();
+  }
+}
+
 const program = new Command();
 
 program
@@ -328,11 +399,17 @@ program.action(async (options: AnalyzeEnvOptions & { analyzeEnv?: boolean; insta
 
 program
   .command("project")
-  .description("run Tessera for the chosen tenant")
-  .argument("<tenant>", "tenant id", asArgument(parseTenant))
+  .description("run Tessera for the chosen tenant (run `tessera fetch` first)")
+  .argument("<tenant>", "project id (24-character hex)", parseProxyTenant)
   .action((tenant: string) => runTenant(tenant));
 
-program.parseAsync().catch((error) => {
+program
+  .command("fetch")
+  .description("fetch the project's active policies from the dashboard into Redis")
+  .option("--force", "download and store again even when Redis holds the active version")
+  .action((options: { force?: boolean }) => runFetch(options));
+
+program.parseAsync().catch((error: unknown) => {
   console.error("Tessera:", error instanceof Error ? error.message : error);
   process.exit(1);
 });

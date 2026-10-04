@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { ProxyReporter } from '../../source/shared/telemetry/ProxyReporter';
-import type { BundleManager } from '../../source/core/policy/BundleManager';
+import type { PolicyStatusSource } from '../../source/core/policy/ActivePolicy';
 
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -17,7 +17,7 @@ it('sends only policy endpoint counters and the loaded bundle version', async ()
     snapshot: { version: 'a'.repeat(64) },
     status: { source: 'remote', restartRequired: false, dashboardReachable: true, pullFailures: 0, verificationFailures: 0 },
     checkForUpdate: async () => undefined,
-  } as unknown as BundleManager;
+  } as unknown as PolicyStatusSource;
   const reporter = new ProxyReporter({ tenantId: '3f2b8c1e4a5d4e6f8a7b9c0d', apiBaseUrl: 'http://dashboard.local/', deploymentKey: 'secret', proxyVersion: '1.0.0' }, bundles);
   reporter.record('POST /users/:id', {
     action: 'ALLOW', reason: 'static analysis safe, not sampled',

@@ -38,6 +38,30 @@ class TenantRedis {
     await this.client.del(this.key(name));
   }
 
+  /** Sets and deletes keys in one MULTI, so readers never see part of the change. */
+  async transaction(sets: [name: string, value: string][], deletes: string[] = []): Promise<void> {
+    const multi = this.client.multi();
+    for (const [name, value] of sets) multi.set(this.key(name), value);
+    for (const name of deletes) multi.del(this.key(name));
+    await multi.exec();
+  }
+
+  async publish(channel: string, message: string): Promise<void> {
+    await this.client.publish(this.key(channel), message);
+  }
+
+  /**
+   * Listens on `channel` over a dedicated connection (a subscribed connection can run no other commands). Messages
+   * published while disconnected are lost, so callers keep a polling fallback. Returns a function that closes it.
+   */
+  async subscribe(channel: string, listener: (message: string) => void): Promise<() => Promise<void>> {
+    const subscriber = this.client.duplicate();
+    subscriber.on("error", (error) => console.error("[redis] subscriber error:", error));
+    await subscriber.connect();
+    await subscriber.subscribe(this.key(channel), listener);
+    return async () => { if (subscriber.isOpen) await subscriber.close(); };
+  }
+
   /** Prepends `value` and keeps only the newest `max` entries (e.g. last 3 requests per IP). */
   async pushRecent(name: string, value: string, max: number, ttlSeconds: number): Promise<void> {
     const key = this.key(name);

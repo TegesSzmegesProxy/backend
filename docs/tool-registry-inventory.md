@@ -18,7 +18,10 @@ npm run tools:registry
 
 ## Policy steps
 
-A signed bundle configures a tool per endpoint step:
+A signed bundle configures a tool per step. In a `tessera.bundle/v3` the steps
+sit in three scopes: `global`, `environment` and each endpoint. The first two
+run on every request, and when a tool and target repeat, the endpoint step
+wins, then the environment one.
 
 ```json
 { "toolId": "brute_force", "contextType": "full", "config": { "attempts": { "suspicious": 5, "block": 20 } } }
@@ -30,7 +33,8 @@ A signed bundle configures a tool per endpoint step:
 The proxy rejects the whole bundle, and keeps its last known good one, when a
 step names an unknown tool, uses another context type than the contract, has a
 missing or malformed target (`body.*`/`query.*` for field tools, the upload
-field for file tools, none for whole-request tools) or a configuration that
+field for file tools, none for whole-request tools; `body.*`, `query.*` and
+`*` only in the global and environment scopes) or a configuration that
 breaks the contract, including unknown settings. Defaults are applied when the
 tool is built, so the signed configuration stays exactly as the dashboard sent
 it.
@@ -38,7 +42,7 @@ it.
 Tools that look across requests (rate limits, brute force, replay and
 duplicate detection, and so on; 21 in total) keep their state in Redis, under
 `tessera:{tenantId}:tools:{toolId}:{step}:`. The step part is a hash of the
-endpoint and the step, so two steps never share state, an unchanged step keeps
+endpoint (or the global or environment scope) and the step, so two steps never share state, an unchanged step keeps
 its windows across bundle updates and restarts, and every proxy process of the
 tenant counts together. Redis expires the state on its own. While Redis is
 unavailable these tools report `ERROR`, which the tenant's

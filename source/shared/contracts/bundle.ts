@@ -2,7 +2,13 @@ import { createHash, createPublicKey, verify, type KeyObject } from "node:crypto
 import { z } from "zod";
 import { TOOL_REGISTRY_V2, TOOL_REGISTRY_V3, V3_TOOLS, isToolId, toolContract } from "./tools";
 
-export const BUNDLE_SCHEMA = "tessera.bundle/v2";
+/** Endpoint steps only, with the v1 policy shape. */
+export const BUNDLE_SCHEMA_V2 = "tessera.bundle/v2";
+/** Global, environment and endpoint scopes with JEV context (`tessera.policy/v3`). */
+export const BUNDLE_SCHEMA_V3 = "tessera.bundle/v3";
+/** Every bundle schema this proxy verifies, newest first (sent as Tessera-Bundle-Schemas). */
+export const SUPPORTED_BUNDLE_SCHEMAS = [BUNDLE_SCHEMA_V3, BUNDLE_SCHEMA_V2] as const;
+export const POLICY_SCHEMA_V3 = "tessera.policy/v3";
 /** The first registry: `string_length` only. Still accepted, so dashboards that only compile v1 keep working. */
 export const TOOL_REGISTRY_V1 = "tessera.tools/v1";
 /** The newest registry this proxy executes; see TOOL_CONTRACTS and docs/tool-registry.json. */
@@ -12,6 +18,11 @@ export const SUPPORTED_TOOL_REGISTRIES = [TOOL_REGISTRY_V3, TOOL_REGISTRY_V2, TO
 export const HEARTBEAT_SCHEMA = "tessera.heartbeat/v1";
 export const TELEMETRY_SCHEMA = "tessera.telemetry/v1";
 export const JEV_CREDENTIAL_SCHEMA = "tessera.jev-credential/v1";
+
+/** JEV context bounds of `tessera.policy/v3`, in characters. */
+export const MAX_SCOPE_JEV_CONTEXT = 1_500;
+export const MAX_ENDPOINT_JEV_CONTEXT = 1_500;
+export const MAX_FIELD_JEV_CONTEXT = 500;
 
 const action = z.enum(["allow", "block"]);
 const probability = z.number().finite().min(0).max(1);
@@ -27,9 +38,15 @@ const TARGETS = {
   file: /^[^\s]+$/,
 } as const;
 
+/**
+ * Targets that name every field of a location ("body.*", "query.*") or every field and upload ("*"). Only the global
+ * and environment scopes may use them: they apply to requests whose fields the policy cannot list.
+ */
+export const WILDCARD_TARGETS: ReadonlySet<string> = new Set(["*", "body.*", "query.*"]);
+
 // The tool, context type, target and configuration of every step are checked against the tool's contract, so a
 // bundle naming an unknown tool or a configuration the proxy can't execute is rejected before anything runs.
-const step = z.strictObject({
+const stepSchema = (allowWildcards: boolean) => z.strictObject({
   toolId: z.string().min(1).max(64),
   contextType: z.enum(["field", "file", "full"]),
   target: z.string().min(1).max(512).optional(),
@@ -45,7 +62,14 @@ const step = z.strictObject({
   }
   if (contract.contextType === "full") {
     if (value.target !== undefined) context.addIssue({ code: "custom", path: ["target"], message: "Whole-request tools take no target" });
-  } else if (value.target === undefined || !TARGETS[contract.contextType].test(value.target)) {
+  } else if (value.target === undefined) {
+    context.addIssue({ code: "custom", path: ["target"], message: `${contract.id} needs a ${contract.contextType} target` });
+  } else if (WILDCARD_TARGETS.has(value.target)) {
+    const fits = contract.contextType === "field" || value.target === "*";
+    if (!allowWildcards || !fits) {
+      context.addIssue({ code: "custom", path: ["target"], message: "Wildcard targets apply only to global and environment steps" });
+    }
+  } else if (!TARGETS[contract.contextType].test(value.target)) {
     context.addIssue({ code: "custom", path: ["target"], message: `${contract.id} needs a ${contract.contextType} target` });
   }
   const config = contract.config.safeParse(value.config);
@@ -55,6 +79,8 @@ const step = z.strictObject({
     }
   }
 });
+const step = stepSchema(false);
+const scopeStep = stepSchema(true);
 
 const runtimeConfig = z.strictObject({
   upstreamUrl: z.url().refine((value) => {
@@ -85,43 +111,91 @@ const runtimeConfig = z.strictObject({
     (value.samplingRate === 0 && value.decision.sampling.maxN === 0))
   .refine((value) => value.decision.jev.attackProbabilityFloor <= value.decision.jev.attackProbabilityThreshold);
 
-export const signedBundleSchema = z.strictObject({
-  schemaVersion: z.literal(BUNDLE_SCHEMA),
+const signature = z.strictObject({
+  algorithm: z.literal("Ed25519"),
+  keyId: z.string().regex(/^[a-f0-9]{32}$/),
+  value: z.string().regex(/^[A-Za-z0-9_-]+$/),
+});
+
+const policyV1 = z.strictObject({
+  schemaVersion: z.literal("tessera.policy/v1"),
+  toolRegistryVersion: z.enum(SUPPORTED_TOOL_REGISTRIES),
+  endpoints: z.array(z.strictObject({
+    method,
+    path,
+    steps: z.array(step).min(1).max(100),
+  })).min(1).max(500),
+}).superRefine((policy, context) => {
+  // a tool added in a later registry is unknown to the dashboards and proxies that compiled this one
+  const needs = (toolId: string) =>
+    policy.toolRegistryVersion === TOOL_REGISTRY_V1 && !V1_TOOLS.has(toolId) ? (V3_TOOLS.has(toolId) ? TOOL_REGISTRY_V3 : TOOL_REGISTRY_V2)
+    : policy.toolRegistryVersion === TOOL_REGISTRY_V2 && V3_TOOLS.has(toolId) ? TOOL_REGISTRY_V3
+    : undefined;
+  policy.endpoints.forEach((endpoint, endpointIndex) => endpoint.steps.forEach((value, stepIndex) => {
+    const registry = needs(value.toolId);
+    if (registry) {
+      context.addIssue({ code: "custom", path: ["endpoints", endpointIndex, "steps", stepIndex, "toolId"], message: `${value.toolId} needs ${registry}` });
+    }
+  }));
+});
+
+const jevContext = (max: number) => z.string().min(1).max(max).nullable();
+const scope = z.strictObject({
+  steps: z.array(scopeStep).max(100),
+  jevContext: jevContext(MAX_SCOPE_JEV_CONTEXT),
+});
+
+/**
+ * `tessera.policy/v3`: global and environment steps run on every request, endpoint steps on their endpoint. When the
+ * same tool and target appear in more than one scope, the most specific one runs (endpoint, then environment, then
+ * global). JEV context is data describing legitimate traffic, never instructions.
+ */
+const policyV3 = z.strictObject({
+  schemaVersion: z.literal(POLICY_SCHEMA_V3),
+  toolRegistryVersion: z.literal(TOOL_REGISTRY_V3),
+  global: scope,
+  environment: scope.extend({ environmentSnapshotId: z.string().regex(/^[a-f0-9]{24}$/).nullable() }),
+  endpoints: z.array(z.strictObject({
+    method,
+    path,
+    steps: z.array(step).max(100),
+    jevContext: jevContext(MAX_ENDPOINT_JEV_CONTEXT),
+    fieldContexts: z.array(z.strictObject({
+      target: z.string().regex(TARGETS.field).max(512),
+      jevContext: z.string().min(1).max(MAX_FIELD_JEV_CONTEXT),
+    })).max(200),
+  })).max(500),
+});
+
+const bundleV2 = z.strictObject({
+  schemaVersion: z.literal(BUNDLE_SCHEMA_V2),
   tenantId,
   version: hash,
   policyVersion: z.string().min(1),
   runtimeConfig,
-  policy: z.strictObject({
-    schemaVersion: z.literal("tessera.policy/v1"),
-    toolRegistryVersion: z.enum(SUPPORTED_TOOL_REGISTRIES),
-    endpoints: z.array(z.strictObject({
-      method,
-      path,
-      steps: z.array(step).min(1).max(100),
-    })).min(1).max(500),
-  }).superRefine((policy, context) => {
-    // a tool added in a later registry is unknown to the dashboards and proxies that compiled this one
-    const needs = (toolId: string) =>
-      policy.toolRegistryVersion === TOOL_REGISTRY_V1 && !V1_TOOLS.has(toolId) ? (V3_TOOLS.has(toolId) ? TOOL_REGISTRY_V3 : TOOL_REGISTRY_V2)
-      : policy.toolRegistryVersion === TOOL_REGISTRY_V2 && V3_TOOLS.has(toolId) ? TOOL_REGISTRY_V3
-      : undefined;
-    policy.endpoints.forEach((endpoint, endpointIndex) => endpoint.steps.forEach((value, stepIndex) => {
-      const registry = needs(value.toolId);
-      if (registry) {
-        context.addIssue({ code: "custom", path: ["endpoints", endpointIndex, "steps", stepIndex, "toolId"], message: `${value.toolId} needs ${registry}` });
-      }
-    }));
-  }),
+  policy: policyV1,
   issuedAt: z.iso.datetime(),
-  signature: z.strictObject({
-    algorithm: z.literal("Ed25519"),
-    keyId: z.string().regex(/^[a-f0-9]{32}$/),
-    value: z.string().regex(/^[A-Za-z0-9_-]+$/),
-  }),
+  signature,
 });
 
+const bundleV3 = z.strictObject({
+  schemaVersion: z.literal(BUNDLE_SCHEMA_V3),
+  tenantId,
+  version: hash,
+  policyVersion: z.string().min(1),
+  runtimeConfig,
+  policy: policyV3,
+  issuedAt: z.iso.datetime(),
+  signature,
+});
+
+export const signedBundleSchema = z.discriminatedUnion("schemaVersion", [bundleV3, bundleV2]);
+
 export type SignedBundle = z.infer<typeof signedBundleSchema>;
+export type SignedBundleV2 = z.infer<typeof bundleV2>;
+export type SignedBundleV3 = z.infer<typeof bundleV3>;
 export type PolicyStep = z.infer<typeof step>;
+export type BundleRuntimeConfig = z.infer<typeof runtimeConfig>;
 
 /** Canonical JSON compatible with the dashboard's signed JSON payload. */
 export function canonicalJson(value: unknown): string {

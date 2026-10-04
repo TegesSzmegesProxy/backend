@@ -1,10 +1,16 @@
 # Tessera proxy
 
-The proxy enforces a signed tenant policy from the Tessera dashboard. It pulls
-the active bundle at startup, verifies its Ed25519 signature and content hash,
-then keeps that immutable snapshot until restart. It writes a verified local
-copy for dashboard outages. A first start without a valid bundle exits before
-opening the ingress port ([ADR-0001](docs/adr/0001-first-start-without-bundle.md)).
+The proxy enforces a signed tenant policy from the Tessera dashboard. Policies
+reach it only through `tessera fetch`
+([ADR-0002](docs/adr/0002-policies-fetched-into-redis.md)):
+1. The fetch pulls the active bundle.
+2. It verifies the bundle's Ed25519 signature, content hash, tenant and every
+   tool step, and builds every tool.
+3. It stores the signed bundle in Redis.
+
+At startup, Ingress loads the stored bundle and verifies it again. If Redis is
+unreachable, nothing was fetched, or the stored bundle is invalid, the proxy
+exits before opening the ingress port and asks you to run `tessera fetch`.
 
 ## Configuration
 
@@ -17,18 +23,40 @@ Copy `.env.example` to `.env` and set:
   `jev-credentials:read`, `heartbeats:write` and `telemetry:write` scopes;
 - `BUNDLE_PUBLIC_KEY`: trusted Ed25519 public key in PEM form. Literal `\n`
   separators are accepted;
-- `BUNDLE_CACHE_FILE`: writable location for the verified bundle;
-- `REDIS_URL`: runtime cache connection address; Redis failure does not stop
-  enforcement;
+- `REDIS_URL`: Redis address. It holds the fetched policies and the state of
+  tools that look across requests. The proxy cannot start without it; an outage
+  while running keeps the loaded policy;
 - `PORT`: ingress port (default `62197`).
 
-Run `npm install` and `npm run dev`. Activate a `tessera.bundle/v2` policy in
-the dashboard before the first proxy start. A previously activated v1 bundle
-must be reactivated with explicit decision settings to produce v2.
+Run `npm install`, activate a policy in the dashboard, then:
+
+```sh
+node cli/bin/tessera.js fetch      # the `tessera` binary of cli/ (npm --prefix cli link installs it)
+npm run dev
+```
+
+`tessera fetch` reads the same `.env` settings. It prints the stored version and
+its steps per scope, and reports when Redis already holds the active version
+(`--force` stores it again, e.g. to repair a damaged copy). If any check fails,
+Redis keeps the policies it had.
+
+Analyses produce `tessera.policy/v3` policies, distributed as
+`tessera.bundle/v3`:
+- global and environment steps run on every request, including unlisted
+  endpoints when unknown endpoints are allowed;
+- endpoint steps run on their endpoint;
+- when a tool and target appear in more than one scope, the endpoint step wins,
+  then the environment one;
+- JEV receives the policy's description of legitimate traffic as labelled
+  data.
+
+`tessera.bundle/v2` (endpoint steps only) is still accepted.
 
 The v2 runtime configuration carries sampling bounds, JEV threshold and floor,
 and separate behaviors for static-analysis errors and unavailable JEV. Field
-targets use `body.<field>` or `query.<field>`; file targets name the upload field. Policy endpoint keys use
+targets use `body.<field>` or `query.<field>`, with `[]` matching any array index
+(`body.items[].sku`); global and environment steps may also use `body.*`,
+`query.*` or `*`. File targets name the upload field. Policy endpoint keys use
 `METHOD /path`; `:name` matches exactly one nonempty path segment. The
 `routing.pathPrefix` is removed before policy matching and upstream forwarding.
 Paths are matched without decoding, and a trailing slash is significant.
@@ -37,9 +65,13 @@ The supported tools and their configuration contracts are described in
 [docs/tool-registry.json](docs/tool-registry.json).
 The versioned network schemas live in [source/shared/contracts](source/shared/contracts).
 
-The proxy checks for a newer bundle once per minute and reports that a restart
-is needed. It never changes the active policy while handling requests. It also
-refreshes the organization JEV credential once per minute and sends a heartbeat
+A running proxy picks up a newly fetched bundle within 30 seconds. It is
+announced over Redis, and the proxy also polls. Each request runs entirely on
+one policy version.
+
+A fetched bundle that changes the upstream is not applied until restart. Once a
+minute the proxy asks the dashboard whether a newer bundle is active, and only
+reports it. It also refreshes the organization JEV credential once per minute and sends a heartbeat
 and redacted minute counters to the dashboard. Request content and secrets are
 not included in telemetry.
 
@@ -63,7 +95,7 @@ echo 'export PATH="$HOME/Tessera/cli/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 
 Windows:
 
-Add `cli\bin` to your user `Path` in Environment Varibles and open a new terminal.
+Add `cli\bin` to your user `Path` in Environment Variables and open a new terminal.
 
 Check it with `tessera --help`. `tessera --install` itself supports Linux (apt, dnf) and macOS (Homebrew); on
 Windows it installs the npm packages and the scanners must be installed by hand.

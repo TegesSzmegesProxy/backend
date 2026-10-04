@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Decision } from "../../core/decisionOrchestrator/orchestrator";
-import type { BundleManager } from "../../core/policy/BundleManager";
-import { BUNDLE_SCHEMA, HEARTBEAT_SCHEMA, SUPPORTED_TOOL_REGISTRIES, TELEMETRY_SCHEMA } from "../contracts/bundle";
+import type { PolicyStatusSource } from "../../core/policy/ActivePolicy";
+import { HEARTBEAT_SCHEMA, SUPPORTED_BUNDLE_SCHEMAS, SUPPORTED_TOOL_REGISTRIES, TELEMETRY_SCHEMA } from "../contracts/bundle";
 import { heartbeatSchema, telemetryBatchSchema } from "../contracts/operations";
 
 interface EndpointCounters {
@@ -32,7 +32,7 @@ export class ProxyReporter {
 
   constructor(
     private readonly options: { tenantId: string; apiBaseUrl: string; deploymentKey: string; proxyVersion: string },
-    private readonly bundles: BundleManager,
+    private readonly bundles: PolicyStatusSource,
   ) {}
 
   record(endpoint: string | null, decision: Decision | { action: "ALLOW" | "BLOCK" }, failureBehaviorApplied = false): void {
@@ -58,7 +58,8 @@ export class ProxyReporter {
   start(): void {
     this.timer = setInterval(() => { void this.tick(); }, 60_000);
     this.timer.unref();
-    void this.heartbeat();
+    // the first heartbeat reports whether the dashboard was reachable, so check before sending it
+    void this.bundles.checkForUpdate().finally(() => this.heartbeat());
   }
 
   async stop(): Promise<void> {
@@ -78,7 +79,7 @@ export class ProxyReporter {
         schemaVersion: HEARTBEAT_SCHEMA,
         instanceId: this.instanceId,
         proxyVersion: this.options.proxyVersion,
-        supportedBundleSchemas: [BUNDLE_SCHEMA],
+        supportedBundleSchemas: [...SUPPORTED_BUNDLE_SCHEMAS],
         supportedToolRegistries: [...SUPPORTED_TOOL_REGISTRIES],
         health: status.dashboardReachable ? "ok" : "degraded",
         tenants: [{ tenantId: this.options.tenantId, bundleSource: status.source, loadedBundleVersion: this.bundles.snapshot.version }],
