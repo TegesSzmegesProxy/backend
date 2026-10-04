@@ -34,7 +34,8 @@ export async function startGateway(options: GatewayOptions): Promise<{ app: Fast
     const aggregator = new Aggregator();
     const orchestrator = new DecisionOrchestrator(
         {
-            jev: new JevClient(new TypeSafeClient({})),
+            // No verdict cache: every case must reach JEV.
+            jev: new JevClient(new TypeSafeClient({}), { get: async () => null, set: async () => {} }),
             adaptive: new AdaptiveControl(),
             sampler: new Sampler(),
             configFor: () => ({

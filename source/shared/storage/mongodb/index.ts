@@ -1,10 +1,9 @@
 import { MongoClient, type Db } from "mongodb";
-import { mongoDbName, mongoUrl } from "../../config";
 import { assertTenantId } from "../tenant-id";
 
 type MongoStorageOptions = {
-  url?: string;
-  dbName?: string;
+  url: string;
+  dbName: string;
 };
 
 class MongoStorage {
@@ -12,7 +11,7 @@ class MongoStorage {
   private readonly dbName: string;
   private connecting: Promise<MongoClient> | undefined;
 
-  constructor({ url = mongoUrl(), dbName = mongoDbName() }: MongoStorageOptions = {}) {
+  constructor({ url, dbName }: MongoStorageOptions) {
     this.client = new MongoClient(url);
     this.dbName = dbName;
   }

@@ -275,7 +275,8 @@ async function main(): Promise<void> {
             await upstream.app.close();
         }
     } else {
-        const jev = new JevClient(new TypeSafeClient({}));
+        // No verdict cache: repeated runs must each reach JEV.
+        const jev = new JevClient(new TypeSafeClient({}), { get: async () => null, set: async () => {} });
         rows = await quietly(() => pool(selected, 5, ({ c, index }) => evalDirect(c, index, fixture, jev, runs)));
     }
 

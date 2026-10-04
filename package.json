@@ -23,7 +23,6 @@
   },
   "dependencies": {
     "@eslint/js": "^9.39.5",
-    "@fastify/env": "^7.0.0",
     "@fastify/http-proxy": "^11.6.3",
     "@fastify/reply-from": "^12.6.5",
     "@toon-format/toon": "^4.1.1",

@@ -15,8 +15,8 @@ export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
     private static readonly MAX_HISTORY = 200; // per client
     private static readonly MAX_CLIENTS = 50_000;
 
-    // client key -> recent requests, oldest first. Static so state is shared however often the tool is instantiated.
-    private static readonly history = new Map<string, Sighting[]>();
+    // client key -> recent requests, oldest first. Per instance: the plan must reuse one instance across requests.
+    private readonly history = new Map<string, Sighting[]>();
 
     constructor() {
         super({
@@ -41,7 +41,7 @@ export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
 
         const now = Date.now();
         const key = `${context.tenantId}|${context.clientIp}`;
-        const recent = (SequenceAnalysis.history.get(key) ?? []).filter(s => now - s.at <= WINDOW_MS);
+        const recent = (this.history.get(key) ?? []).filter(s => now - s.at <= WINDOW_MS);
 
         // ponytail: assumes the pipeline runs each tool once per request; a retry would count twice.
         recent.push({ at: now, endpoint: context.endpoint, ids: SequenceAnalysis.integerValues(context) });
@@ -50,12 +50,12 @@ export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
         }
 
         // delete + set moves the client to the end of the Map, so eviction drops the least recently active one
-        SequenceAnalysis.history.delete(key);
-        SequenceAnalysis.history.set(key, recent);
-        while (SequenceAnalysis.history.size > SequenceAnalysis.MAX_CLIENTS) {
-            const oldest = SequenceAnalysis.history.keys().next();
+        this.history.delete(key);
+        this.history.set(key, recent);
+        while (this.history.size > SequenceAnalysis.MAX_CLIENTS) {
+            const oldest = this.history.keys().next();
             if (oldest.done) break;
-            SequenceAnalysis.history.delete(oldest.value);
+            this.history.delete(oldest.value);
         }
 
         const distinct = new Set(recent.map(s => s.endpoint)).size;
@@ -107,10 +107,5 @@ export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
             }
         }
         return best;
-    }
-
-    // For tests.
-    static reset(): void {
-        SequenceAnalysis.history.clear();
     }
 }

@@ -82,16 +82,14 @@ const FILE_TOOLS: Record<string, new () => FileTool> = {
     mime_type: MimeType,
     archive_expansion_ratio: ArchiveExpansionRatio,
 };
-/** Run on every request. */
-const REQUEST_TOOLS: (new () => FullTool)[] = [PrivateIp, DuplicateRequest, RateLimit, RequestSize];
+/** Run on every request. One shared instance each, so rate and duplicate state carries across requests as in the proxy. */
+const REQUEST_TOOLS: FullTool[] = [new PrivateIp(), new DuplicateRequest(), new RateLimit(), new RequestSize()];
 
 /** Ids of every tool the fixture can exercise. */
 export const ALL_TOOL_IDS: string[] = [
-    ...DEFAULT_FIELD_TOOLS,
-    ...Object.values(EXTRA_FIELD_TOOLS),
-    ...Object.values(FILE_TOOLS),
-    ...REQUEST_TOOLS,
-].map((Tool) => new Tool().tool);
+    ...[...DEFAULT_FIELD_TOOLS, ...Object.values(EXTRA_FIELD_TOOLS), ...Object.values(FILE_TOOLS)].map((Tool) => new Tool().tool),
+    ...REQUEST_TOOLS.map((tool) => tool.tool),
+];
 
 export function loadFixture(): Fixture {
     return JSON.parse(readFileSync(resolve(__dirname, 'jev-cases.json'), 'utf8'));
@@ -144,7 +142,7 @@ export function planFor(request: NormalizedRequest, policy: EndpointPolicy): Exe
     for (const field of [...new Set(request.files.map((file) => file.field))]) {
         for (const id of policy.fileTools ?? []) plan.push({ tool: new FILE_TOOLS[id](), target: field });
     }
-    for (const Tool of REQUEST_TOOLS) plan.push({ tool: new Tool() });
+    for (const tool of REQUEST_TOOLS) plan.push({ tool });
     return plan;
 }
 

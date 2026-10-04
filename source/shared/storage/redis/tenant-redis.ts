@@ -11,9 +11,15 @@ class TenantRedis {
 
   constructor(
     private readonly client: RedisClient,
-    tenantId: string,
+    private readonly tenantId: string,
+    private readonly namespace: string = "",
   ) {
-    this.prefix = `tessera:${assertTenantId(tenantId)}:`;
+    this.prefix = `tessera:${assertTenantId(tenantId)}:${namespace}`;
+  }
+
+  /** Same tenant, keys further namespaced under `{name}:`. */
+  sub(name: string): TenantRedis {
+    return new TenantRedis(this.client, this.tenantId, `${this.namespace}${name}:`);
   }
 
   key(name: string): string {

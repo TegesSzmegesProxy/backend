@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { parseHttpx } from '../../../source/analysis/environment/tools/httpx';
-import { parseLynis } from '../../../source/analysis/environment/tools/lynis';
-import { parseNmap } from '../../../source/analysis/environment/tools/nmap';
-import { parseNuclei } from '../../../source/analysis/environment/tools/nuclei';
-import { parseTrivy } from '../../../source/analysis/environment/tools/trivy';
+import { parseHttpx } from '../../../source/core/environment-analysis/tools/httpx';
+import { parseLynis } from '../../../source/core/environment-analysis/tools/lynis';
+import { parseNmap } from '../../../source/core/environment-analysis/tools/nmap';
+import { parseNuclei } from '../../../source/core/environment-analysis/tools/nuclei';
+import { parseTrivy } from '../../../source/core/environment-analysis/tools/trivy';
 
 const fixture = (name: string) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
 
