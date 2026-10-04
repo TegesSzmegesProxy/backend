@@ -1,5 +1,5 @@
 {
-  "registryVersion": "tessera.tools/v2",
+  "registryVersion": "tessera.tools/v3",
   "tools": [
     {
       "id": "additional_properties",
@@ -3524,6 +3524,19 @@
       "category": "injection",
       "contextType": "field",
       "description": "Detects ../ sequences, including encoded forms, and references to sensitive files.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "php_object_injection",
+      "displayName": "PHP object injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects PHP serialized objects (also base64-encoded), gadget-chain classes, serialized string escapes and phar:// wrappers.",
       "config": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

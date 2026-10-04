@@ -36,6 +36,7 @@ export const injectionTools = {
   nosql_injection: detector("nosql_injection", "NoSQL injection", "field", "Detects MongoDB operators, server-side JavaScript and shell methods in values."),
   null_byte: detector("null_byte", "Null byte", "field", "Detects raw and encoded NUL bytes that truncate strings in lower layers."),
   path_traversal: detector("path_traversal", "Path traversal", "field", "Detects ../ sequences, including encoded forms, and references to sensitive files."),
+  php_object_injection: detector("php_object_injection", "PHP object injection", "field", "Detects PHP serialized objects (also base64-encoded), gadget-chain classes, serialized string escapes and phar:// wrappers."),
   polyglot_file: detector("polyglot_file", "Polyglot file", "file", "Detects uploads that are valid as two formats at once (an image that is also a script or archive)."),
   prompt_injection: detector("prompt_injection", "Prompt injection", "full", "Detects instructions aimed at an LLM that override its system prompt or exfiltrate data."),
   prototype_pollution: detector("prototype_pollution", "Prototype pollution", "field", "Detects __proto__, constructor and prototype keys that modify object prototypes."),

@@ -14,6 +14,9 @@ export type { ToolCategoryName, ToolContextTypeName, ToolContract } from "./comm
 
 /** Registry version of the tool set below. Adding or changing a contract requires a new version. */
 export const TOOL_REGISTRY_V2 = "tessera.tools/v2";
+export const TOOL_REGISTRY_V3 = "tessera.tools/v3";
+/** Tools added in v3; a policy compiled for v2 cannot name them. */
+export const V3_TOOLS: ReadonlySet<string> = new Set(["php_object_injection"]);
 
 /**
  * Every tool the proxy can execute: its id, metadata and configuration contract. Shared by the proxy and
@@ -60,7 +63,7 @@ export function defaultToolConfig<Id extends ToolId>(id: Id): ToolConfig<Id> {
 /** The machine-readable registry published as docs/tool-registry.json: metadata plus JSON Schema per tool. */
 export function toolRegistryDocument() {
   return {
-    registryVersion: TOOL_REGISTRY_V2,
+    registryVersion: TOOL_REGISTRY_V3,
     tools: TOOL_IDS.map((id) => {
       const contract = toolContract(id);
       return {

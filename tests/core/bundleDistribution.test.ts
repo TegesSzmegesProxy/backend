@@ -103,7 +103,11 @@ describe('bundle distribution', () => {
     const v1Step = { toolId: 'string_length', contextType: 'field', target: 'body.name', config: { maxLength: 5 } };
     expect(verifier.verify(withSteps([v1Step], 'tessera.tools/v1')).policy.toolRegistryVersion).toBe('tessera.tools/v1');
     expect(() => verifier.verify(withSteps([valid[1]], 'tessera.tools/v1'))).toThrow();
-    expect(() => verifier.verify(withSteps([valid[1]], 'tessera.tools/v3'))).toThrow();
+    expect(() => verifier.verify(withSteps([valid[1]], 'tessera.tools/v4'))).toThrow();
+
+    const v3Step = { toolId: 'php_object_injection', contextType: 'field', target: 'body.data', config: {} };
+    expect(verifier.verify(withSteps([v3Step, valid[1]], 'tessera.tools/v3')).policy.toolRegistryVersion).toBe('tessera.tools/v3');
+    expect(() => verifier.verify(withSteps([v3Step]))).toThrow(); // php_object_injection needs tessera.tools/v3
   });
 
   it('uses the last verified disk copy during an outage and never switches a running snapshot', async () => {

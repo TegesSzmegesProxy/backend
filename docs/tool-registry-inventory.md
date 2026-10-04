@@ -1,7 +1,7 @@
 # Proxy tool registry
 
-The proxy executes the tools of `tessera.tools/v2`: every tool in
-`source/core/static-analysis/tools`, 149 in total. Each one has a **tool
+The proxy executes the tools of `tessera.tools/v3`: every tool in
+`source/core/static-analysis/tools`, 150 in total. Each one has a **tool
 contract** in [`source/shared/contracts/tools`](../source/shared/contracts/tools):
 its id, display name, category, context type, description and a Zod schema of
 its configuration. The proxy and the dashboard compiler validate policies
@@ -44,8 +44,9 @@ tenant counts together. Redis expires the state on its own. While Redis is
 unavailable these tools report `ERROR`, which the tenant's
 static-analysis failure behavior decides; they never fall back to `SAFE`.
 
-`tessera.tools/v1` bundles are still accepted; they may only use
-`string_length`. The proxy advertises both registries in
+Older bundles are still accepted: `tessera.tools/v1` ones may only use
+`string_length`, and `tessera.tools/v2` ones every tool except those added in
+v3 (`php_object_injection`). The proxy advertises all three registries in
 `Tessera-Tool-Registries` and in its heartbeat.
 
 ## What is configuration and what is not

@@ -1,14 +1,14 @@
 import { createHash, createPublicKey, verify, type KeyObject } from "node:crypto";
 import { z } from "zod";
-import { TOOL_REGISTRY_V2, isToolId, toolContract } from "./tools";
+import { TOOL_REGISTRY_V2, TOOL_REGISTRY_V3, V3_TOOLS, isToolId, toolContract } from "./tools";
 
 export const BUNDLE_SCHEMA = "tessera.bundle/v2";
 /** The first registry: `string_length` only. Still accepted, so dashboards that only compile v1 keep working. */
 export const TOOL_REGISTRY_V1 = "tessera.tools/v1";
 /** The newest registry this proxy executes; see TOOL_CONTRACTS and docs/tool-registry.json. */
-export const TOOL_REGISTRY = TOOL_REGISTRY_V2;
+export const TOOL_REGISTRY = TOOL_REGISTRY_V3;
 /** Every registry this proxy executes, newest first (sent as Tessera-Tool-Registries). */
-export const SUPPORTED_TOOL_REGISTRIES = [TOOL_REGISTRY_V2, TOOL_REGISTRY_V1] as const;
+export const SUPPORTED_TOOL_REGISTRIES = [TOOL_REGISTRY_V3, TOOL_REGISTRY_V2, TOOL_REGISTRY_V1] as const;
 export const HEARTBEAT_SCHEMA = "tessera.heartbeat/v1";
 export const TELEMETRY_SCHEMA = "tessera.telemetry/v1";
 export const JEV_CREDENTIAL_SCHEMA = "tessera.jev-credential/v1";
@@ -100,10 +100,15 @@ export const signedBundleSchema = z.strictObject({
       steps: z.array(step).min(1).max(100),
     })).min(1).max(500),
   }).superRefine((policy, context) => {
-    if (policy.toolRegistryVersion !== TOOL_REGISTRY_V1) return;
+    // a tool added in a later registry is unknown to the dashboards and proxies that compiled this one
+    const needs = (toolId: string) =>
+      policy.toolRegistryVersion === TOOL_REGISTRY_V1 && !V1_TOOLS.has(toolId) ? (V3_TOOLS.has(toolId) ? TOOL_REGISTRY_V3 : TOOL_REGISTRY_V2)
+      : policy.toolRegistryVersion === TOOL_REGISTRY_V2 && V3_TOOLS.has(toolId) ? TOOL_REGISTRY_V3
+      : undefined;
     policy.endpoints.forEach((endpoint, endpointIndex) => endpoint.steps.forEach((value, stepIndex) => {
-      if (!V1_TOOLS.has(value.toolId)) {
-        context.addIssue({ code: "custom", path: ["endpoints", endpointIndex, "steps", stepIndex, "toolId"], message: `${value.toolId} needs ${TOOL_REGISTRY_V2}` });
+      const registry = needs(value.toolId);
+      if (registry) {
+        context.addIssue({ code: "custom", path: ["endpoints", endpointIndex, "steps", stepIndex, "toolId"], message: `${value.toolId} needs ${registry}` });
       }
     }));
   }),

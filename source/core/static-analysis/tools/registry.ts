@@ -72,6 +72,7 @@ import MaliciousFileUpload from './injection/maliciousFileUpload';
 import NoSqlInjection from './injection/noSQLInjection';
 import NullByte from './injection/nullByte';
 import PathTraversal from './injection/pathTraversal';
+import PhpObjectInjection from './injection/phpObjectInjection';
 import PolyglotFile from './injection/polyglotFile';
 import PromptInjection from './injection/promptInjection';
 import PrototypePollution from './injection/prototypePollution';
@@ -249,6 +250,7 @@ const FACTORIES: ToolFactories = {
     password_spraying: (config, state) => new PasswordSpraying(config, state),
     path_normalization: config => new PathNormalization(config),
     path_traversal: () => new PathTraversal(),
+    php_object_injection: () => new PhpObjectInjection(),
     pii_in_request: config => new PiiInRequest(config),
     polyglot_file: () => new PolyglotFile(),
     private_ip: () => new PrivateIp(),
