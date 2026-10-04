@@ -1,3 +1,4 @@
+import { findingKey, uniqueBy } from './dedupe';
 import type { LynisResult, SecurityFinding } from '../types';
 
 export const lynisArgs = (reportFile: string): string[] => [
@@ -27,7 +28,7 @@ export function parseLynis(report: string, privileged: boolean): LynisResult {
 }
 
 function findings(lines: string[], prefix: string, severity: SecurityFinding['severity']): SecurityFinding[] {
-    return lines
+    const parsed = lines
         .filter(line => line.startsWith(prefix))
         .map(line => {
             const [ruleId = '', text = '', details = '-', solution = '-'] = line.slice(prefix.length).split('|');
@@ -42,4 +43,5 @@ function findings(lines: string[], prefix: string, severity: SecurityFinding['se
                 ...(solution !== '-' && solution !== '' && { remediation: solution }),
             };
         });
+    return uniqueBy(parsed, findingKey);
 }

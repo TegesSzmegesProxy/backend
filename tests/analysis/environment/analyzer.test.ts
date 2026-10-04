@@ -36,7 +36,7 @@ function fakeRunner(overrides: Record<string, (args: string[]) => CommandResult 
     return { runner, calls };
 }
 
-const input = { tenantId: 'acme', projectPath: __dirname, targets: ['http://127.0.0.1:8099'], lynis: true };
+const input = { tenantId: 'acme', projectPath: __dirname, targets: ['http://127.0.0.1:8099'] };
 
 describe('EnvironmentAnalyzer', () => {
     it('runs every tool and attributes each result', async () => {
@@ -76,7 +76,7 @@ describe('EnvironmentAnalyzer', () => {
 
     it('skips tools whose input is missing', async () => {
         const { runner, calls } = fakeRunner();
-        const result = await new EnvironmentAnalyzer(runner).analyze({ tenantId: 'acme', targets: [], lynis: false });
+        const result = await new EnvironmentAnalyzer(runner).analyze({ tenantId: 'acme', targets: [], disabled: ['lynis'] });
         expect(result.nmap.status).toBe('skipped');
         expect(result.nuclei.status).toBe('skipped');
         expect(result.httpx.status).toBe('skipped');

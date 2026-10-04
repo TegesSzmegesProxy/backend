@@ -47,6 +47,11 @@ describe('parseHttpx', () => {
 });
 
 describe('parseNuclei', () => {
+    it('reports a finding once when a template matches the same URL repeatedly', () => {
+        const line = fixture('nuclei.jsonl').split('\n').find(Boolean) as string;
+        expect(parseNuclei([line, line, line].join('\n')).findings).toHaveLength(1);
+    });
+
     it('tags findings with the tool and normalizes CVE ids', () => {
         const { findings } = parseNuclei(fixture('nuclei.jsonl'));
         expect(findings).toHaveLength(2);

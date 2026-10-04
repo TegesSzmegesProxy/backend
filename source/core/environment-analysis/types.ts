@@ -22,8 +22,8 @@ export interface EnvironmentAnalysisInput {
     projectPath?: string;
     /** http(s) URLs, hostnames or IPs; without any, nmap, httpx and nuclei are skipped. */
     targets: string[];
-    /** Lynis audits the local machine, so it only runs when asked for. */
-    lynis: boolean;
+    /** Tools to skip; each is reported as a skipped run. */
+    disabled?: EnvironmentTool[];
     /** Per-tool timeout for this analysis; overrides the analyzer's defaults. */
     timeoutsMs?: Partial<Record<EnvironmentTool, number>>;
     /** Nuclei requests per second (`-rl`); nuclei's own default applies when omitted. */

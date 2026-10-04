@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { findingKey, uniqueBy } from './dedupe';
 import { normalizeSeverity } from '../severity';
 import type { SecurityFinding, TrivyResult, TrivyVulnerability } from '../types';
 
@@ -94,7 +95,11 @@ export function parseTrivy(output: string): TrivyResult {
             });
         }
     }
-    return parsed;
+    return {
+        vulnerabilities: uniqueBy(parsed.vulnerabilities, v => [v.id, v.package, v.installedVersion, v.target]),
+        misconfigurations: uniqueBy(parsed.misconfigurations, findingKey),
+        secrets: uniqueBy(parsed.secrets, findingKey),
+    };
 }
 
 function toVulnerability(

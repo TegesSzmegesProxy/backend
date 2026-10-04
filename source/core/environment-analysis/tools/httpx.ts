@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { uniqueBy } from './dedupe';
 import type { HttpTarget, HttpxResult } from '../types';
 
 const lineSchema = z.object({
@@ -35,7 +36,7 @@ export function parseHttpx(output: string): HttpxResult {
         // httpx also prints a line for probes that never connected; those are not reachable targets.
         .filter(line => line.failed !== true)
         .map(toTarget);
-    return { targets };
+    return { targets: uniqueBy(targets, t => [t.url]) };
 }
 
 function toTarget(line: z.infer<typeof lineSchema>): HttpTarget {

@@ -41,7 +41,6 @@ const runner: CommandRunner = {
         tenantId: 'mock',
         projectPath: process.cwd(),
         targets: ['http://127.0.0.1:8099'],
-        lynis: true,
     });
     console.log(JSON.stringify(result, null, 2));
 })();

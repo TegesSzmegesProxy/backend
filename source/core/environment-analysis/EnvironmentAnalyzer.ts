@@ -78,6 +78,9 @@ export class EnvironmentAnalyzer {
     async analyze(input: EnvironmentAnalysisInput): Promise<EnvironmentAnalysisResult> {
         if (!TENANT_ID.test(input.tenantId)) throw new EnvironmentInputError('invalid tenantId');
         const targets = parseTargets(input.targets);
+        for (const tool of input.disabled ?? []) {
+            if (!(tool in this.binaries)) throw new EnvironmentInputError(`unknown tool in disabled: ${tool}`);
+        }
         if (input.projectPath !== undefined) await assertProjectDirectory(input.projectPath);
         const timeoutsMs = this.resolveTimeouts(input.timeoutsMs);
         const rateLimit = input.nucleiRateLimit;
@@ -86,17 +89,19 @@ export class EnvironmentAnalyzer {
         }
 
         const startedAt = new Date().toISOString();
+        const disabled = new Set(input.disabled ?? []);
+        const skip = (tool: EnvironmentTool, reason: string | undefined) => (disabled.has(tool) ? 'disabled' : reason);
         const noTargets = targets.urls.length === 0 ? 'no targets given' : undefined;
         const [nmap, nuclei, trivy, httpx, lynis] = await Promise.all([
-            this.track('nmap', noTargets, async () => parseNmap(await this.exec('nmap', nmapArgs(targets.hosts), timeoutsMs.nmap))),
-            this.track('nuclei', noTargets, async () => parseNuclei(await this.exec('nuclei', nucleiArgs(targets.urls, rateLimit), timeoutsMs.nuclei))),
+            this.track('nmap', skip('nmap', noTargets), async () => parseNmap(await this.exec('nmap', nmapArgs(targets.hosts), timeoutsMs.nmap))),
+            this.track('nuclei', skip('nuclei', noTargets), async () => parseNuclei(await this.exec('nuclei', nucleiArgs(targets.urls, rateLimit), timeoutsMs.nuclei))),
             this.track(
                 'trivy',
-                input.projectPath === undefined ? 'no projectPath given' : undefined,
+                skip('trivy', input.projectPath === undefined ? 'no projectPath given' : undefined),
                 async () => parseTrivy(await this.exec('trivy', trivyArgs(input.projectPath as string), timeoutsMs.trivy))
             ),
-            this.track('httpx', noTargets, async () => parseHttpx(await this.exec('httpx', httpxArgs(targets.urls), timeoutsMs.httpx))),
-            this.track('lynis', input.lynis ? undefined : 'lynis not requested', () => this.runLynis(timeoutsMs.lynis)),
+            this.track('httpx', skip('httpx', noTargets), async () => parseHttpx(await this.exec('httpx', httpxArgs(targets.urls), timeoutsMs.httpx))),
+            this.track('lynis', skip('lynis', undefined), () => this.runLynis(timeoutsMs.lynis)),
         ]);
 
         return { tenantId: input.tenantId, startedAt, completedAt: new Date().toISOString(), nmap, nuclei, trivy, httpx, lynis };

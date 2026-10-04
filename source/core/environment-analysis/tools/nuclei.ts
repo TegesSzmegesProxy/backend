@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { normalizeSeverity } from '../severity';
 import type { NucleiResult, SecurityFinding } from '../types';
+import { findingKey, uniqueBy } from './dedupe';
 import { jsonLines } from './httpx';
 
 // `cve-id` is an array, a single string or an explicit null depending on the template.
@@ -31,7 +32,8 @@ export const nucleiArgs = (urls: string[], rateLimit?: number): string[] => [
 export function parseNuclei(output: string): NucleiResult {
     // `request`, `response` and `extracted-results` are deliberately never read:
     // they can hold credentials and are not needed to explain a finding.
-    return { findings: jsonLines(output).map(line => toFinding(lineSchema.parse(line))) };
+    const findings = jsonLines(output).map(line => toFinding(lineSchema.parse(line)));
+    return { findings: uniqueBy(findings, findingKey) };
 }
 
 function toFinding(line: z.infer<typeof lineSchema>): SecurityFinding {

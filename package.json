@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit",
     "dev": "nodemon --exec tsx ./source/bootstrap.ts",
     "analyze:mock": "tsx ./scripts/environment-mock.ts",
-    "eval:jev": "tsx ./scripts/jev-eval.ts",
+    "eval:jev": "tsx --env-file=.env ./scripts/jev-eval.ts",
     "mock:upstream": "tsx ./scripts/mock-upstream.ts"
   },
   "dependencies": {

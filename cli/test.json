@@ -1,0 +1,903 @@
+{
+  "tenantId": "filesystem",
+  "startedAt": "2026-10-04T01:29:32.878Z",
+  "completedAt": "2026-10-04T01:31:51.498Z",
+  "nmap": {
+    "tool": "nmap",
+    "startedAt": "2026-10-04T01:29:32.878Z",
+    "durationMs": 11382,
+    "status": "ok",
+    "result": {
+      "hosts": [
+        {
+          "address": "127.0.0.1",
+          "hostname": "localhost",
+          "ports": [
+            {
+              "port": 25,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "smtp",
+              "version": "Postfix smtpd"
+            },
+            {
+              "port": 139,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "netbios-ssn",
+              "version": "Samba smbd 4.6.2"
+            },
+            {
+              "port": 445,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "netbios-ssn",
+              "version": "Samba smbd 4.6.2"
+            },
+            {
+              "port": 631,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "ipp",
+              "version": "CUPS 2.4"
+            },
+            {
+              "port": 3333,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "http",
+              "version": "Node.js Express framework"
+            },
+            {
+              "port": 5000,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "upnp"
+            },
+            {
+              "port": 5432,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "postgresql",
+              "version": "PostgreSQL DB 9.6.0 or later"
+            },
+            {
+              "port": 8099,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "http",
+              "version": "SimpleHTTPServer 0.6"
+            },
+            {
+              "port": 9090,
+              "protocol": "tcp",
+              "state": "open",
+              "service": "zeus-admin"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "nuclei": {
+    "tool": "nuclei",
+    "startedAt": "2026-10-04T01:29:32.883Z",
+    "durationMs": 138615,
+    "status": "ok",
+    "result": {
+      "findings": [
+        {
+          "source": "nuclei",
+          "ruleId": "node-express-dev-env",
+          "severity": "medium",
+          "title": "Node.js Express NODE_ENV Development Mode",
+          "description": "The Node.js application runs in development mode, which can expose sensitive information, such as source code and secrets, depending on the application.",
+          "target": "localhost",
+          "evidence": "http://localhost:3333/",
+          "cves": []
+        },
+        {
+          "source": "nuclei",
+          "ruleId": "options-method",
+          "severity": "info",
+          "title": "Allowed Options Method",
+          "description": "",
+          "target": "localhost",
+          "evidence": "http://localhost:3333/",
+          "cves": []
+        },
+        {
+          "source": "nuclei",
+          "ruleId": "tech-detect",
+          "severity": "info",
+          "title": "Wappalyzer Technology Detection",
+          "description": "",
+          "target": "localhost",
+          "evidence": "http://localhost:3333/",
+          "cves": []
+        },
+        {
+          "source": "nuclei",
+          "ruleId": "form-detection",
+          "severity": "info",
+          "title": "Form Detection",
+          "description": "A template to detect HTML Forms in page response.",
+          "target": "localhost",
+          "evidence": "http://localhost:3333/",
+          "cves": []
+        },
+        {
+          "source": "nuclei",
+          "ruleId": "http-missing-security-headers",
+          "severity": "info",
+          "title": "HTTP Missing Security Headers",
+          "description": "This template searches for missing HTTP security headers. The impact of these missing headers can vary.",
+          "target": "localhost",
+          "evidence": "http://localhost:3333/",
+          "cves": []
+        }
+      ]
+    }
+  },
+  "trivy": {
+    "tool": "trivy",
+    "startedAt": "2026-10-04T01:29:32.885Z",
+    "durationMs": 1509,
+    "status": "ok",
+    "result": {
+      "vulnerabilities": [
+        {
+          "id": "CVE-2026-25547",
+          "package": "@isaacs/brace-expansion",
+          "installedVersion": "5.0.0",
+          "fixedVersion": "5.0.1",
+          "severity": "high",
+          "title": "brace-expansion: brace-expansion: Denial of Service via unbounded brace range expansion",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-12590",
+          "package": "body-parser",
+          "installedVersion": "2.2.1",
+          "fixedVersion": "1.20.6, 2.3.0",
+          "severity": "low",
+          "title": "body-parser: body-parser: Denial of Service via invalid limit option",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-102276",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "5.0.10, 3.0.7, 2.1.5, 1.1.19",
+          "severity": "high",
+          "title": "brace-expansion: brace-expansion: Denial of Service via stack exhaustion from crafted brace patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-102278",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "5.0.11, 3.0.8, 2.1.6, 1.1.20",
+          "severity": "high",
+          "title": "brace-expansion: brace-expansion: Denial of Service via uncontrolled recursion in nested brace patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-13149",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "5.0.7, 1.1.16, 2.1.2",
+          "severity": "high",
+          "title": "brace-expansion: Brace-expansion: Denial of Service due to exponential-time complexity",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-14257",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "5.0.8, 3.0.3, 2.1.3, 1.1.17",
+          "severity": "high",
+          "title": "brace-expansion: Brace-expansion: Denial of Service via memory exhaustion in expand() function",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-69152",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "1.1.18, 2.1.4, 3.0.6, 5.0.9",
+          "severity": "high",
+          "title": "brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-102277",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "5.0.12, 3.0.9, 2.1.7, 1.1.21",
+          "severity": "medium",
+          "title": "brace-expansion: brace-expansion: Denial of Service via crafted brace patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33750",
+          "package": "brace-expansion",
+          "installedVersion": "2.0.2",
+          "fixedVersion": "5.0.5, 3.0.2, 2.0.3, 1.1.13",
+          "severity": "medium",
+          "title": "brace-expansion: brace-expansion: Denial of Service via zero step value in brace pattern",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33937",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "critical",
+          "title": "handlebars.js: Handlebars: Remote Code Execution via crafted Abstract Syntax Tree object in compile()",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33938",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "high",
+          "title": "handlebars: Handlebars: Arbitrary code execution via @partial-block overwrite",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33939",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "high",
+          "title": "handlebars.js: Handlebars.js: Denial of Service via malformed decorator syntax in template compilation",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33940",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "high",
+          "title": "handlebars.js: Handlebars.js: Arbitrary code execution via crafted template context",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33941",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "high",
+          "title": "handlebars.js: Handlebars: Arbitrary code execution via CLI precompiler input sanitization flaw",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-33916",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "medium",
+          "title": "handlebars.js: Handlebars: Cross-Site Scripting (XSS) via prototype pollution in partial resolution",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "GHSA-7rx3-28cr-v5wh",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "medium",
+          "title": "Handlebars.js has a Prototype Method Access Control Gap via Missing __lookupSetter__ Blocklist Entry",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "GHSA-442j-39wm-28r2",
+          "package": "handlebars",
+          "installedVersion": "4.7.8",
+          "fixedVersion": "4.7.9",
+          "severity": "low",
+          "title": "Handlebars.js has a Property Access Validation Bypass in container.lookup",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-4800",
+          "package": "lodash",
+          "installedVersion": "4.17.21",
+          "fixedVersion": "4.18.0",
+          "severity": "high",
+          "title": "lodash: lodash: Arbitrary code execution via untrusted input in template imports",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2025-13465",
+          "package": "lodash",
+          "installedVersion": "4.17.21",
+          "fixedVersion": "4.17.23",
+          "severity": "medium",
+          "title": "lodash: prototype pollution in _.unset and _.omit functions",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-2950",
+          "package": "lodash",
+          "installedVersion": "4.17.21",
+          "fixedVersion": "4.18.0",
+          "severity": "medium",
+          "title": "lodash: Lodash: Prototype pollution allows deletion of built-in prototype properties via array path bypass",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-26996",
+          "package": "minimatch",
+          "installedVersion": "10.1.1",
+          "fixedVersion": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3",
+          "severity": "high",
+          "title": "minimatch: minimatch: Denial of Service via specially crafted glob patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-27903",
+          "package": "minimatch",
+          "installedVersion": "10.1.1",
+          "fixedVersion": "10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.3",
+          "severity": "high",
+          "title": "minimatch: minimatch: Denial of Service due to unbounded recursive backtracking via crafted glob patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-27904",
+          "package": "minimatch",
+          "installedVersion": "10.1.1",
+          "fixedVersion": "10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.4",
+          "severity": "high",
+          "title": "minimatch: Minimatch: Denial of Service via catastrophic backtracking in glob expressions",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-26996",
+          "package": "minimatch",
+          "installedVersion": "5.1.6",
+          "fixedVersion": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3",
+          "severity": "high",
+          "title": "minimatch: minimatch: Denial of Service via specially crafted glob patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-27903",
+          "package": "minimatch",
+          "installedVersion": "5.1.6",
+          "fixedVersion": "10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.3",
+          "severity": "high",
+          "title": "minimatch: minimatch: Denial of Service due to unbounded recursive backtracking via crafted glob patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-27904",
+          "package": "minimatch",
+          "installedVersion": "5.1.6",
+          "fixedVersion": "10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.4",
+          "severity": "high",
+          "title": "minimatch: Minimatch: Denial of Service via catastrophic backtracking in glob expressions",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-26996",
+          "package": "minimatch",
+          "installedVersion": "9.0.5",
+          "fixedVersion": "10.2.1, 9.0.6, 8.0.5, 7.4.7, 6.2.1, 5.1.7, 4.2.4, 3.1.3",
+          "severity": "high",
+          "title": "minimatch: minimatch: Denial of Service via specially crafted glob patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-27903",
+          "package": "minimatch",
+          "installedVersion": "9.0.5",
+          "fixedVersion": "10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.3",
+          "severity": "high",
+          "title": "minimatch: minimatch: Denial of Service due to unbounded recursive backtracking via crafted glob patterns",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-27904",
+          "package": "minimatch",
+          "installedVersion": "9.0.5",
+          "fixedVersion": "10.2.3, 9.0.7, 8.0.6, 7.4.8, 6.2.2, 5.1.8, 4.2.5, 3.1.4",
+          "severity": "high",
+          "title": "minimatch: Minimatch: Denial of Service via catastrophic backtracking in glob expressions",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-4926",
+          "package": "path-to-regexp",
+          "installedVersion": "8.3.0",
+          "fixedVersion": "8.4.0",
+          "severity": "high",
+          "title": "path-to-regexp: path-to-regexp: Denial of Service via crafted regular expressions",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-4923",
+          "package": "path-to-regexp",
+          "installedVersion": "8.3.0",
+          "fixedVersion": "8.4.0",
+          "severity": "medium",
+          "title": "path-to-regexp: path-to-regexp: Denial of Service via specially crafted paths with multiple wildcards",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-82417",
+          "package": "qs",
+          "installedVersion": "6.14.1",
+          "fixedVersion": "6.16.0",
+          "severity": "medium",
+          "title": "qs: qs: Denial of Service via improper validation in stringify function",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-8723",
+          "package": "qs",
+          "installedVersion": "6.14.1",
+          "fixedVersion": "6.15.2",
+          "severity": "medium",
+          "title": "qs: qs: Denial of Service due to improper handling of null/undefined array elements",
+          "target": "package-lock.json"
+        },
+        {
+          "id": "CVE-2026-2391",
+          "package": "qs",
+          "installedVersion": "6.14.1",
+          "fixedVersion": "6.14.2",
+          "severity": "low",
+          "title": "qs: qs's arrayLimit bypass in comma parsing allows denial of service",
+          "target": "package-lock.json"
+        }
+      ],
+      "misconfigurations": [],
+      "secrets": []
+    }
+  },
+  "httpx": {
+    "tool": "httpx",
+    "startedAt": "2026-10-04T01:29:32.888Z",
+    "durationMs": 836,
+    "status": "ok",
+    "result": {
+      "targets": [
+        {
+          "url": "http://localhost:3333/",
+          "statusCode": 200,
+          "title": "Document",
+          "technologies": [
+            "Express",
+            "Node.js"
+          ],
+          "headers": {
+            "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            "content-length": "989",
+            "content-type": "text/html; charset=utf-8",
+            "date": "Sun, 04 Oct 2026 01:29:33 GMT",
+            "etag": "W/\"3dd-kYWf0u8lihWyF7UJkyk9GqN6TLE\"",
+            "expires": "0",
+            "surrogate-control": "no-store",
+            "x-powered-by": "Express"
+          },
+          "tls": {
+            "enabled": false
+          }
+        }
+      ]
+    }
+  },
+  "lynis": {
+    "tool": "lynis",
+    "startedAt": "2026-10-04T01:29:32.890Z",
+    "durationMs": 133887,
+    "status": "ok",
+    "result": {
+      "score": 65,
+      "privileged": false,
+      "warnings": [
+        {
+          "source": "lynis",
+          "ruleId": "MAIL-8818",
+          "severity": "medium",
+          "title": "Found some information disclosure in SMTP banner (OS or software name)",
+          "description": "Found some information disclosure in SMTP banner (OS or software name)",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1820",
+          "severity": "medium",
+          "title": "MongoDB instance allows any user to access databases",
+          "description": "MongoDB instance allows any user to access databases",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1828",
+          "severity": "medium",
+          "title": "PostgreSQL configuration file /etc/postgresql/16/main/postgresql.conf is world readable and might leak sensitive details",
+          "description": "PostgreSQL configuration file /etc/postgresql/16/main/postgresql.conf is world readable and might leak sensitive details",
+          "target": "/etc/postgresql/16/main/postgresql.conf",
+          "cves": [],
+          "remediation": "Use chmod 600 to change file permissions"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1828",
+          "severity": "medium",
+          "title": "PostgreSQL configuration file /etc/postgresql/16/main/pg_ctl.conf is world readable and might leak sensitive details",
+          "description": "PostgreSQL configuration file /etc/postgresql/16/main/pg_ctl.conf is world readable and might leak sensitive details",
+          "target": "/etc/postgresql/16/main/pg_ctl.conf",
+          "cves": [],
+          "remediation": "Use chmod 600 to change file permissions"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1828",
+          "severity": "medium",
+          "title": "PostgreSQL configuration file /etc/postgresql/16/main/start.conf is world readable and might leak sensitive details",
+          "description": "PostgreSQL configuration file /etc/postgresql/16/main/start.conf is world readable and might leak sensitive details",
+          "target": "/etc/postgresql/16/main/start.conf",
+          "cves": [],
+          "remediation": "Use chmod 600 to change file permissions"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1828",
+          "severity": "medium",
+          "title": "PostgreSQL configuration file /etc/postgresql/14/main/postgresql.conf is world readable and might leak sensitive details",
+          "description": "PostgreSQL configuration file /etc/postgresql/14/main/postgresql.conf is world readable and might leak sensitive details",
+          "target": "/etc/postgresql/14/main/postgresql.conf",
+          "cves": [],
+          "remediation": "Use chmod 600 to change file permissions"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1828",
+          "severity": "medium",
+          "title": "PostgreSQL configuration file /etc/postgresql/14/main/pg_ctl.conf is world readable and might leak sensitive details",
+          "description": "PostgreSQL configuration file /etc/postgresql/14/main/pg_ctl.conf is world readable and might leak sensitive details",
+          "target": "/etc/postgresql/14/main/pg_ctl.conf",
+          "cves": [],
+          "remediation": "Use chmod 600 to change file permissions"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "DBS-1828",
+          "severity": "medium",
+          "title": "PostgreSQL configuration file /etc/postgresql/14/main/start.conf is world readable and might leak sensitive details",
+          "description": "PostgreSQL configuration file /etc/postgresql/14/main/start.conf is world readable and might leak sensitive details",
+          "target": "/etc/postgresql/14/main/start.conf",
+          "cves": [],
+          "remediation": "Use chmod 600 to change file permissions"
+        }
+      ],
+      "suggestions": [
+        {
+          "source": "lynis",
+          "ruleId": "BOOT-5264",
+          "severity": "low",
+          "title": "Consider hardening system services",
+          "description": "Consider hardening system services",
+          "target": "Run '/usr/bin/systemd-analyze security SERVICE' for each service",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "KRNL-5820",
+          "severity": "low",
+          "title": "If not required, consider explicit disabling of core dump in /etc/security/limits.conf file",
+          "description": "If not required, consider explicit disabling of core dump in /etc/security/limits.conf file",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PROC-3612",
+          "severity": "low",
+          "title": "Check the output of ps for dead or zombie processes",
+          "description": "Check the output of ps for dead or zombie processes",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "AUTH-9228",
+          "severity": "low",
+          "title": "Run pwck manually and correct any errors in the password file",
+          "description": "Run pwck manually and correct any errors in the password file",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "AUTH-9230",
+          "severity": "low",
+          "title": "Configure password hashing rounds in /etc/login.defs",
+          "description": "Configure password hashing rounds in /etc/login.defs",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "AUTH-9262",
+          "severity": "low",
+          "title": "Install a PAM module for password strength testing like pam_cracklib or pam_passwdqc or libpam-passwdqc",
+          "description": "Install a PAM module for password strength testing like pam_cracklib or pam_passwdqc or libpam-passwdqc",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "AUTH-9286",
+          "severity": "low",
+          "title": "Configure minimum password age in /etc/login.defs",
+          "description": "Configure minimum password age in /etc/login.defs",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "AUTH-9328",
+          "severity": "low",
+          "title": "Default umask in /etc/login.defs could be more strict like 027",
+          "description": "Default umask in /etc/login.defs could be more strict like 027",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "FILE-6310",
+          "severity": "low",
+          "title": "To decrease the impact of a full /tmp file system, place /tmp on a separate partition",
+          "description": "To decrease the impact of a full /tmp file system, place /tmp on a separate partition",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "USB-1000",
+          "severity": "low",
+          "title": "Disable drivers like USB storage when not used, to prevent unauthorized storage or data theft",
+          "description": "Disable drivers like USB storage when not used, to prevent unauthorized storage or data theft",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "NAME-4028",
+          "severity": "low",
+          "title": "Check DNS configuration for the dns domain name",
+          "description": "Check DNS configuration for the dns domain name",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "NAME-4404",
+          "severity": "low",
+          "title": "Add the IP name and FQDN to /etc/hosts for proper name resolving",
+          "description": "Add the IP name and FQDN to /etc/hosts for proper name resolving",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PKGS-7346",
+          "severity": "low",
+          "title": "Purge old/removed packages (110 found) with aptitude purge or dpkg --purge command. This will cleanup old configuration files, cron jobs and startup scripts.",
+          "description": "Purge old/removed packages (110 found) with aptitude purge or dpkg --purge command. This will cleanup old configuration files, cron jobs and startup scripts.",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PKGS-7370",
+          "severity": "low",
+          "title": "Install debsums utility for the verification of packages with known good database.",
+          "description": "Install debsums utility for the verification of packages with known good database.",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PKGS-7394",
+          "severity": "low",
+          "title": "Install package apt-show-versions for patch management purposes",
+          "description": "Install package apt-show-versions for patch management purposes",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PKGS-7398",
+          "severity": "low",
+          "title": "Install a package audit tool to determine vulnerable packages",
+          "description": "Install a package audit tool to determine vulnerable packages",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PKGS-7420",
+          "severity": "low",
+          "title": "Consider using a tool to automatically apply upgrades",
+          "description": "Consider using a tool to automatically apply upgrades",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "NETW-3200",
+          "severity": "low",
+          "title": "Determine if protocol 'dccp' is really needed on this system",
+          "description": "Determine if protocol 'dccp' is really needed on this system",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PRNT-2307",
+          "severity": "low",
+          "title": "Access to CUPS configuration could be more strict.",
+          "description": "Access to CUPS configuration could be more strict.",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "MAIL-8818",
+          "severity": "low",
+          "title": "You are advised to hide the mail_name (option: smtpd_banner) from your postfix configuration. Use postconf -e or change your main.cf file (/etc/postfix/main.cf)",
+          "description": "You are advised to hide the mail_name (option: smtpd_banner) from your postfix configuration. Use postconf -e or change your main.cf file (/etc/postfix/main.cf)",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "MAIL-8820:disable_vrfy_command",
+          "severity": "low",
+          "title": "Disable the 'VRFY' command",
+          "description": "Disable the 'VRFY' command",
+          "target": "disable_vrfy_command=no",
+          "cves": [],
+          "remediation": "text:run postconf -e disable_vrfy_command=yes to change the value"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "HTTP-6640",
+          "severity": "low",
+          "title": "Install Apache mod_evasive to guard webserver against DoS/brute force attempts",
+          "description": "Install Apache mod_evasive to guard webserver against DoS/brute force attempts",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "HTTP-6643",
+          "severity": "low",
+          "title": "Install Apache modsecurity to guard webserver against web application attacks",
+          "description": "Install Apache modsecurity to guard webserver against web application attacks",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "PHP-2376",
+          "severity": "low",
+          "title": "Change the allow_url_fopen line to: allow_url_fopen = Off, to disable downloads via PHP",
+          "description": "Change the allow_url_fopen line to: allow_url_fopen = Off, to disable downloads via PHP",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "LOGG-2154",
+          "severity": "low",
+          "title": "Enable logging to an external logging host for archiving purposes and additional protection",
+          "description": "Enable logging to an external logging host for archiving purposes and additional protection",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "LOGG-2190",
+          "severity": "low",
+          "title": "Check what deleted files are still in use and why.",
+          "description": "Check what deleted files are still in use and why.",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "BANN-7126",
+          "severity": "low",
+          "title": "Add a legal banner to /etc/issue, to warn unauthorized users",
+          "description": "Add a legal banner to /etc/issue, to warn unauthorized users",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "BANN-7130",
+          "severity": "low",
+          "title": "Add legal banner to /etc/issue.net, to warn unauthorized users",
+          "description": "Add legal banner to /etc/issue.net, to warn unauthorized users",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "ACCT-9622",
+          "severity": "low",
+          "title": "Enable process accounting",
+          "description": "Enable process accounting",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "ACCT-9626",
+          "severity": "low",
+          "title": "Enable sysstat to collect accounting (disabled)",
+          "description": "Enable sysstat to collect accounting (disabled)",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "ACCT-9628",
+          "severity": "low",
+          "title": "Enable auditd to collect audit information",
+          "description": "Enable auditd to collect audit information",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "MACF-6208",
+          "severity": "low",
+          "title": "Check output of aa-status",
+          "description": "Check output of aa-status",
+          "target": "/sys/kernel/security/apparmor/profiles",
+          "cves": [],
+          "remediation": "text:Run aa-status"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "FINT-4350",
+          "severity": "low",
+          "title": "Install a file integrity tool to monitor changes to critical and sensitive files",
+          "description": "Install a file integrity tool to monitor changes to critical and sensitive files",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "TOOL-5002",
+          "severity": "low",
+          "title": "Determine if automation tools are present for system management",
+          "description": "Determine if automation tools are present for system management",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "FILE-7524",
+          "severity": "low",
+          "title": "Consider restricting file permissions",
+          "description": "Consider restricting file permissions",
+          "target": "See screen output or log file",
+          "cves": [],
+          "remediation": "text:Use chmod to change file permissions"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "HOME-9304",
+          "severity": "low",
+          "title": "Double check the permissions of home directories as some might be not strict enough.",
+          "description": "Double check the permissions of home directories as some might be not strict enough.",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "KRNL-6000",
+          "severity": "low",
+          "title": "One or more sysctl values differ from the scan profile and could be tweaked",
+          "description": "One or more sysctl values differ from the scan profile and could be tweaked",
+          "cves": [],
+          "remediation": "Change sysctl value or disable test (skip-test=KRNL-6000:<sysctl-key>)"
+        },
+        {
+          "source": "lynis",
+          "ruleId": "HRDN-7222",
+          "severity": "low",
+          "title": "Harden compilers like restricting access to root user only",
+          "description": "Harden compilers like restricting access to root user only",
+          "cves": []
+        },
+        {
+          "source": "lynis",
+          "ruleId": "HRDN-7230",
+          "severity": "low",
+          "title": "Harden the system by installing at least one malware scanner, to perform periodic file system scans",
+          "description": "Harden the system by installing at least one malware scanner, to perform periodic file system scans",
+          "cves": [],
+          "remediation": "Install a tool like rkhunter, chkrootkit, OSSEC, Wazuh"
+        }
+      ]
+    }
+  }
+}
