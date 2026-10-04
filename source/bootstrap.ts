@@ -1,100 +1,97 @@
-import { TypeSafeClient } from "@typesafe-ai/sdk";
 import { IngressServer } from "./edge";
 import { Normalizer } from "./edge/normalizer";
-import { Runner, type ExecutionPlan } from "./core/static-analysis/runner";
+import { Runner } from "./core/static-analysis/runner";
 import { Aggregator } from "./core/static-analysis/aggregator";
-import { JevClient } from "./core/jev";
+import { CredentialManager } from "./core/jev";
 import { DecisionOrchestrator, type DecisionConfig, type RuntimeConfig } from "./core/decisionOrchestrator";
 import { Sampler } from "./core/sampling";
-import Xss from "./core/static-analysis/tools/injection/xss";
-import SqlInjection from "./core/static-analysis/tools/injection/sqlinjection";
 import { AdaptiveControl } from "./feedback";
-import { Broker } from "./shared/broker";
-import { MongoStorage, RedisStorage } from "./shared/storage";
+import { RedisStorage } from "./shared/storage";
 import { loadConfig } from "./shared/config";
+import { BundleVerifier } from "./shared/contracts";
+import { BundleManager, PolicySnapshot } from "./core/policy";
+import { ProxyReporter } from "./shared/telemetry";
+import { version } from "../package.json";
 
 const REDIS_STARTUP_TIMEOUT_MS = 5_000;
 
-// Placeholder values until per-tenant runtime config arrives with the policy bundle (TODO T04/T20/T31/T35).
-// N is a probability (0-1); thresholds are on the JEV attack probability (0-1) and tighten toward the floor under attack.
-const PLACEHOLDER_RUNTIME_CONFIG: RuntimeConfig = {
-  sampling: { probabilityN: 0.1, minN: 0.01, maxN: 1 },
-  threshold: { attackProbabilityThreshold: 0.7, attackProbabilityFloor: 0.5, locked: false },
-};
-const PLACEHOLDER_PLAN: ExecutionPlan = [
-  { tool: new Xss(), target: "login" },
-  { tool: new SqlInjection(), target: "login" },
-];
-
-const FAILURE_POLICY: DecisionConfig = {
-  staticAnalysisError: "BLOCK",
-  suspiciousWhenJevUnavailable: "BLOCK",
-  sampledWhenJevUnavailable: "ALLOW",
-};
-
-// Redis only holds non-authoritative context, so an unreachable Redis must not block startup.
-// node-redis keeps retrying in the background and the dependent features recover on their own.
-async function connectOptional(name: string, connect: () => Promise<void>): Promise<void> {
+async function connectOptional(connect: () => Promise<void>): Promise<void> {
   let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<void>((resolve) => {
-    timer = setTimeout(() => {
-      console.warn(`[bootstrap] ${name} not reachable yet, continuing without it`);
-      resolve();
-    }, REDIS_STARTUP_TIMEOUT_MS);
-  });
   try {
-    await Promise.race([connect(), timeout]);
+    await Promise.race([
+      connect(),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, REDIS_STARTUP_TIMEOUT_MS); }),
+    ]);
   } catch (error) {
-    console.warn(`[bootstrap] ${name} failed to connect, continuing without it:`, error);
-  } finally {
-    clearTimeout(timer);
-  }
+    console.warn("[bootstrap] Redis unavailable; cache will be bypassed:", error);
+  } finally { clearTimeout(timer); }
 }
 
-/** Composition root: every long-lived instance is created and owned here, and shut down in reverse. */
+/** The signed bundle is loaded before opening the ingress port. */
 async function main(): Promise<void> {
   const config = loadConfig();
-
-  // Infrastructure.
-  // MongoDB is the durable source of truth: failing to connect aborts startup.
-  // `mongo` is the top-level database of the app.
-  const mongo = new MongoStorage({ url: config.mongo.url, dbName: config.mongo.dbName });
-  const tenantsDb = new MongoStorage({ url: config.mongo.url, dbName: config.mongo.tenantsDbName });
-  // await mongo.connect();
+  const verifier = new BundleVerifier(config.dashboard.publicKey, config.tenantId);
+  const bundles = new BundleManager({
+    tenantId: config.tenantId,
+    apiBaseUrl: config.dashboard.url,
+    deploymentKey: config.dashboard.apiKey,
+    cacheFile: config.dashboard.cacheFile,
+  }, verifier);
+  const bundle = await bundles.start();
+  const snapshot = new PolicySnapshot(bundle);
   const redis = new RedisStorage({ url: config.redisUrl });
-  const broker = new Broker({ url: config.redisUrl });
-  await Promise.all([
-    connectOptional("redis", () => redis.connect()),
-    connectOptional("broker", () => broker.connect()),
-  ]);
-  const tenantRedis = redis.tenant(config.tenantId);
-
-  // Request path.
-  const orchestrator = new DecisionOrchestrator(
-    {
-      jev: new JevClient(new TypeSafeClient({ apiKey: config.jev.apiKey }), tenantRedis.sub("jev-verdict-cache")),
-      adaptive: new AdaptiveControl(),
-      sampler: new Sampler(),
-      configFor: () => PLACEHOLDER_RUNTIME_CONFIG,
-    },
-    FAILURE_POLICY,
+  await connectOptional(() => redis.connect());
+  const tenantRedis = redis.tenant(config.tenantId).sub(bundle.version);
+  const credential = new CredentialManager(
+    config.dashboard.url,
+    config.dashboard.apiKey,
+    (credentialVersion) => tenantRedis.sub(`jev-${credentialVersion}`),
   );
-  const ingress = new IngressServer(
-    {
-      normalizer: new Normalizer(),
-      runner: new Runner(),
-      aggregator: new Aggregator(),
-      orchestrator,
-      planFor: () => PLACEHOLDER_PLAN,
-      recentRequests: tenantRedis.sub("ingress-requests-cache"),
+  await credential.refresh();
+  const decision = bundle.runtimeConfig.decision;
+  const runtime: RuntimeConfig = {
+    sampling: { probabilityN: bundle.runtimeConfig.samplingRate, minN: decision.sampling.minN, maxN: decision.sampling.maxN },
+    threshold: {
+      attackProbabilityThreshold: decision.jev.attackProbabilityThreshold,
+      attackProbabilityFloor: decision.jev.attackProbabilityFloor,
+      locked: decision.jev.locked,
     },
-    { tenantId: config.tenantId, ...config.ingress },
-  );
+  };
+  const failures: DecisionConfig = {
+    staticAnalysisError: decision.onStaticAnalysisError.toUpperCase() as DecisionConfig["staticAnalysisError"],
+    suspiciousWhenJevUnavailable: decision.onSuspiciousJevUnavailable.toUpperCase() as DecisionConfig["suspiciousWhenJevUnavailable"],
+    sampledWhenJevUnavailable: decision.onSampledJevUnavailable.toUpperCase() as DecisionConfig["sampledWhenJevUnavailable"],
+  };
+  const orchestrator = new DecisionOrchestrator({
+    jev: credential,
+    adaptive: new AdaptiveControl(),
+    sampler: new Sampler(),
+    configFor: () => runtime,
+  }, failures);
+  const reporter = new ProxyReporter({
+    tenantId: config.tenantId,
+    apiBaseUrl: config.dashboard.url,
+    deploymentKey: config.dashboard.apiKey,
+    proxyVersion: version,
+  }, bundles);
+  const ingress = new IngressServer({
+    normalizer: new Normalizer(),
+    runner: new Runner(),
+    aggregator: new Aggregator(),
+    orchestrator,
+    snapshot,
+    reporter,
+  }, { tenantId: config.tenantId, port: config.ingress.port });
   await ingress.start();
+  reporter.start();
+  const credentialTimer = setInterval(() => { void credential.refresh(); }, 60_000);
+  credentialTimer.unref();
 
   const shutdown = async (): Promise<void> => {
+    clearInterval(credentialTimer);
     await ingress.stop();
-    await Promise.allSettled([broker.disconnect(), redis.disconnect(), mongo.disconnect(), tenantsDb.disconnect()]);
+    await reporter.stop();
+    await redis.disconnect();
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

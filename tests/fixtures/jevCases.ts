@@ -24,7 +24,7 @@ import RateLimit from '../../source/core/static-analysis/tools/resource/rateLimi
 import PrivateIp from '../../source/core/static-analysis/tools/anomaly/privateIP';
 import DuplicateRequest from '../../source/core/static-analysis/tools/anomaly/duplicateRequest';
 
-export const EVAL_TENANT = '3f2b8c1e-4a5d-4e6f-8a7b-9c0d1e2f3a4b';
+export const EVAL_TENANT = '3f2b8c1e4a5d4e6f8a7b9c0d';
 
 export interface EndpointPolicy {
     /** Declared type per flattened field name, as a compiled policy would supply. Overrides `typeof`. */
@@ -75,7 +75,7 @@ const DEFAULT_FIELD_TOOLS: (new () => FieldTool)[] = [SqlInjection, Xss, Command
 const EXTRA_FIELD_TOOLS: Record<string, new () => FieldTool> = {
     url_validator: UrlValidator,
     integer_range: IntegerRange,
-    string_length: StringLength,
+    string_length: class extends StringLength { constructor() { super({ minLength: 10 }); } },
 };
 const FILE_TOOLS: Record<string, new () => FileTool> = {
     file_size: FileSize,
@@ -128,16 +128,18 @@ export function applyPolicy(request: NormalizedRequest, policy: EndpointPolicy, 
 /** The execution plan a compiled policy would give this request. */
 export function planFor(request: NormalizedRequest, policy: EndpointPolicy): ExecutionPlan {
     const plan: ToolStep[] = [];
-    const names = [...new Set(request.fields.map((field) => field.name))];
+    const fields = [...new Map(request.fields.map((field) => [`${field.location}.${field.name}`, field])).values()];
 
-    for (const name of names) {
+    for (const field of fields) {
+        const name = field.name;
+        const target = `${field.location}.${name}`;
         // zod_type_check only knows JSON types, so a policy type such as "url" is checked by its own tool instead.
         const zodKnowsType = policy.declared[name] !== 'url';
         for (const Tool of DEFAULT_FIELD_TOOLS) {
             if (Tool === TypeCheck && !zodKnowsType) continue;
-            plan.push({ tool: new Tool(), target: name });
+            plan.push({ tool: new Tool(), target });
         }
-        for (const id of policy.extraTools?.[name] ?? []) plan.push({ tool: new EXTRA_FIELD_TOOLS[id](), target: name });
+        for (const id of policy.extraTools?.[name] ?? []) plan.push({ tool: new EXTRA_FIELD_TOOLS[id](), target });
     }
     for (const field of [...new Set(request.files.map((file) => file.field))]) {
         for (const id of policy.fileTools ?? []) plan.push({ tool: new FILE_TOOLS[id](), target: field });

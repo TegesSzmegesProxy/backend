@@ -6,8 +6,8 @@ import type { DynamicVerdict } from '../../source/core/jev/client';
 import type { StaticVerdict } from '../../source/core/static-analysis/aggregator';
 import type { NormalizedRequest } from '../../source/shared/contracts';
 
-const TENANT = '3f2b8c1e-4a5d-4e6f-8a7b-9c0d1e2f3a4b';
-const OTHER_TENANT = '7a1b2c3d-4e5f-4a6b-9c8d-0e1f2a3b4c5d';
+const TENANT = '3f2b8c1e4a5d4e6f8a7b9c0d';
+const OTHER_TENANT = '7a1b2c3d4e5f4a6b9c8d0e1f';
 const LOGIN = 'POST /login';
 
 const ATTACK: DynamicVerdict = { score: 2.5, attackProbability: 0.95, confidence: 0.9 };

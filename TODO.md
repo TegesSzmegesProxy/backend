@@ -1,5 +1,10 @@
 # Tessera TODO
 
+> Historical checklist from 2026-10-03. Several entries below describe the old
+> prototype and are no longer current. See [README.md](README.md) for proxy
+> runtime behavior and [docs/dashboard-integration-plan.md](docs/dashboard-integration-plan.md)
+> for the integration scope and remaining cross-repository work.
+
 Last synced with codebase: 2026-10-03 (HEAD `861b8a2` + uncommitted environment-analyzer and ingress work)
 
 ## Current Status

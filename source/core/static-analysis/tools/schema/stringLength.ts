@@ -2,7 +2,7 @@ import { RequestField } from '@tessera/shared/contracts/Request';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 export default class StringLength extends Tool<ToolContextType.Field> {
-    constructor () {
+    constructor (private readonly config: { minLength?: number; maxLength?: number }) {
         super({
             id: 'string_length',
             displayName: 'String length',
@@ -12,14 +12,20 @@ export default class StringLength extends Tool<ToolContextType.Field> {
     }
 
     override run(context: RequestField): ToolResult {
-        const length = 10; // hard-coded until we have enough infrastructure to support tool configuration
         if (typeof context.value === 'string') {
-            if (context.value.length < length) { // comparison operator also hard-coded for now
+            if (this.config.minLength !== undefined && context.value.length < this.config.minLength) {
                 return {
                     tool: this.tool,
                     status: 'SUCCESS',
                     verdict: 'POLICY_VIOLATION',
-                    evidence: `${context.value.length} < ${length}`,
+                    evidence: `${context.value.length} < ${this.config.minLength}`,
+                }
+            } else if (this.config.maxLength !== undefined && context.value.length > this.config.maxLength) {
+                return {
+                    tool: this.tool,
+                    status: 'SUCCESS',
+                    verdict: 'POLICY_VIOLATION',
+                    evidence: `${context.value.length} > ${this.config.maxLength}`,
                 }
             } else {
                 return {

@@ -82,6 +82,7 @@ export class JevClient {
         const state = encode(this.buildState(request, staticAnalysis));
         const key = this.cacheKey(state);
         const previousVerdict = await this.checkVerdict(key);
+        console.log(previousVerdict ? `JEV cache hit for ${request.requestId} (endpoint ${request.endpoint})` : `JEV cache miss for ${request.requestId} (endpoint ${request.endpoint})`);
         if (previousVerdict !== undefined) return previousVerdict;
 
         const response = await this.model.systemOne({
@@ -102,6 +103,8 @@ export class JevClient {
             attackProbability,
             confidence: Math.abs(2 * attackProbability - 1),
         };
+
+        console.log(`JEV verdict for ${request.requestId} (endpoint ${request.endpoint}):`, verdict);
 
         this.storeVerdict(key, verdict);
 

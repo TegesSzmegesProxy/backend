@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { z } from "zod";
+import { assertTenantId } from "../storage/tenant-id";
 
 // Empty values count as unset, so `FOO=` in a .env file falls back to the default.
 const optional = <T extends z.ZodType>(schema: T) =>
@@ -8,22 +9,22 @@ const optional = <T extends z.ZodType>(schema: T) =>
 
 const envSchema = z.object({
   REDIS_URL: z.string().min(1),
-  MONGO_URL: z.string().min(1),
-  MONGO_DB_NAME: optional(z.string().default("tessera")),
-  TENANT_DB_NAME: optional(z.string().default("tenants")),
-  TENANT_ID: z.string().min(1),
-  UPSTREAM_URL: z.string().min(1),
-  TYPESAFE_API_KEY: z.string().min(1),
+  TENANT_ID: z.string().regex(/^[a-f0-9]{24}$/),
+  DASHBOARD_API_URL: z.url().refine((value) => {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && !url.username && !url.password;
+  }),
+  DEPLOYMENT_API_KEY: z.string().min(1),
+  BUNDLE_PUBLIC_KEY: z.string().min(1),
+  BUNDLE_CACHE_FILE: z.string().min(1),
   PORT: optional(z.coerce.number().int().min(0).max(65535).default(62197)),
-  REQUESTS_CACHE_SIZE: optional(z.coerce.number().int().min(0).default(10)),
 });
 
 interface ProxyConfig {
   tenantId: string;
   redisUrl: string;
-  mongo: { url: string; dbName: string; tenantsDbName: string };
-  ingress: { port: number; upstreamUrl: string; requestsCacheSize: number };
-  jev: { apiKey: string };
+  dashboard: { url: string; apiKey: string; publicKey: string; cacheFile: string };
+  ingress: { port: number };
 }
 
 /**
@@ -41,11 +42,10 @@ function loadConfig(envFile: string = resolve(process.cwd(), ".env")): ProxyConf
   }
   const env = parsed.data;
   return {
-    tenantId: env.TENANT_ID,
+    tenantId: assertTenantId(env.TENANT_ID),
     redisUrl: env.REDIS_URL,
-    mongo: { url: env.MONGO_URL, dbName: env.MONGO_DB_NAME, tenantsDbName: env.TENANT_DB_NAME },
-    ingress: { port: env.PORT, upstreamUrl: env.UPSTREAM_URL, requestsCacheSize: env.REQUESTS_CACHE_SIZE },
-    jev: { apiKey: env.TYPESAFE_API_KEY },
+    dashboard: { url: env.DASHBOARD_API_URL, apiKey: env.DEPLOYMENT_API_KEY, publicKey: env.BUNDLE_PUBLIC_KEY, cacheFile: env.BUNDLE_CACHE_FILE },
+    ingress: { port: env.PORT },
   };
 }
 

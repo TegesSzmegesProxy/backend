@@ -44,8 +44,10 @@ export class SamplingController {
 }
 
 function assertSamplingConfig({ probabilityN, minN, maxN }: SamplingConfig): void {
-    // minN > 0 keeps JEV observations flowing; with 0 an endpoint could never raise its own N.
+    // A completely disabled sampling range is explicit. Otherwise minN > 0
+    // keeps observations flowing so the endpoint can raise its own N.
+    if (minN === 0 && probabilityN === 0 && maxN === 0) return;
     if (!(minN > 0 && minN <= probabilityN && probabilityN <= maxN && maxN <= 1)) {
-        throw new Error('Sampling config must satisfy 0 < minN <= probabilityN <= maxN <= 1');
+        throw new Error('Sampling config must be all zero or satisfy 0 < minN <= probabilityN <= maxN <= 1');
     }
 }

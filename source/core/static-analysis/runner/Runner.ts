@@ -25,7 +25,7 @@ export class Runner {
     private resolveContexts(request: NormalizedRequest, step: ToolStep): ContextMap[ToolContextType][] {
         switch (step.tool.metadata.contextType) {
             case ToolContextType.Field:
-                return request.fields.filter((field) => field.name === (step as { target: string }).target);
+                return request.fields.filter((field) => `${field.location}.${field.name}` === (step as { target: string }).target);
             case ToolContextType.File:
                 return request.files.filter((file) => file.field === (step as { target: string }).target);
             case ToolContextType.Full:
