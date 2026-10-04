@@ -1,5 +1,5 @@
 {
-  "name": "backend",
+  "name": "@tessera/proxy",
   "version": "1.0.0",
   "description": "Proxy backend",
   "homepage": "https://github.com/TegesSzmegesProxy/backend#readme",
