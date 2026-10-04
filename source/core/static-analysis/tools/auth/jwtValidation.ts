@@ -1,18 +1,9 @@
 import { JsonWebTokenError, NotBeforeError, TokenExpiredError, verify } from 'jsonwebtoken';
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
-// hard-coded until we have enough infrastructure to support tool configuration
-// PEM public key (or certificate) of the token issuer. Read from the environment for now.
-const PUBLIC_KEY = (process.env['TESSERA_JWT_PUBLIC_KEY'] ?? '').replace(/\\n/g, '\n');
-const ISSUER = 'https://auth.example.com';
-const AUDIENCE = 'tessera-api';
-const CLOCK_TOLERANCE_SECONDS = 60;
-const MAX_TOKEN_LENGTH = 4096;
-
-// Asymmetric algorithms only. Never list HS* next to a public key: an attacker can then sign a token
-// with HMAC using the (public) key as the secret ("algorithm confusion").
-const ALLOWED_ALGORITHMS = ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512'] as const;
+// config.allowedAlgorithms is asymmetric only (see the contract). Never accept HS* next to a public key: an
+// attacker can then sign a token with HMAC using the (public) key as the secret ("algorithm confusion").
 
 // JWT header parameters that make a verifier fetch or trust a key supplied by the token itself.
 const KEY_REFERENCE_PARAMS = ['jku', 'x5u', 'jwk'];
@@ -20,13 +11,17 @@ const KEY_REFERENCE_PARAMS = ['jku', 'x5u', 'jwk'];
 const BEARER = /^bearer +(\S+) *$/i;
 
 export default class JwtValidation extends Tool<ToolContextType.Full> {
-    constructor() {
+    private readonly publicKey: string;
+
+    constructor(private readonly config: ToolConfig<'jwt_validation'>) {
         super({
             id: 'jwt_validation',
             displayName: 'JWT validation',
             category: ToolCategory.Auth,
             contextType: ToolContextType.Full,
         });
+        // keys pasted through JSON often arrive with escaped newlines
+        this.publicKey = config.publicKey.replace(/\\n/g, '\n');
     }
 
     override run(context: NormalizedRequest): ToolResult {
@@ -36,28 +31,18 @@ export default class JwtValidation extends Tool<ToolContextType.Full> {
         const token = typeof header === 'string' ? header.match(BEARER)?.[1] : undefined;
 
         // Not a compact JWS (exactly two dots), so it is an opaque token this tool can't judge.
-        if (!token || token.length > MAX_TOKEN_LENGTH || token.split('.').length !== 3) {
+        if (!token || token.length > this.config.maxTokenLength || token.split('.').length !== 3) {
             return JwtValidation.safe(this.tool);
-        }
-
-        // Without a key the token can't be verified, which is different from "valid"
-        if (PUBLIC_KEY === '') {
-            return {
-                tool: this.tool,
-                status: 'ERROR',
-                verdict: 'ERROR',
-                evidence: { reason: 'missing_public_key' },
-            };
         }
 
         const rules: string[] = [];
 
         try {
-            const { header: jwtHeader, payload } = verify(token, PUBLIC_KEY, {
-                algorithms: [...ALLOWED_ALGORITHMS],
-                issuer: ISSUER,
-                audience: AUDIENCE,
-                clockTolerance: CLOCK_TOLERANCE_SECONDS,
+            const { header: jwtHeader, payload } = verify(token, this.publicKey, {
+                algorithms: [...this.config.allowedAlgorithms],
+                issuer: this.config.issuer,
+                audience: this.config.audience,
+                clockTolerance: this.config.clockToleranceSeconds,
                 complete: true,
             });
 

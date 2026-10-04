@@ -11,6 +11,8 @@ export interface NormalizedRequest {
     fields: RequestField[];
     files: RequestFile[];
     timestamp: number;
+    /** Transport details some tools need (raw headers, TLS fingerprint, response snapshot, ...). See RequestMetadata. */
+    metadata?: object;
 }
 
 export interface RequestField {

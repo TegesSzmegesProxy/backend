@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 type JsonSchema = Parameters<typeof z.fromJSONSchema>[0];
@@ -7,30 +7,19 @@ type JsonSchema = Parameters<typeof z.fromJSONSchema>[0];
 // Validates the whole request body against a JSON Schema. Full context, because a schema
 // constrains the shape (required keys, nesting, additionalProperties) that no single field can see.
 export default class JsonSchemaCheck extends Tool<ToolContextType.Full> {
-    private readonly validator: z.ZodType | undefined;
+    private readonly validator: z.ZodType;
 
-    // hard-coded until we have enough infrastructure to support tool configuration:
-    // the schema comes from the constructor, and without one the tool reports ERROR rather than a false SAFE.
-    constructor(schema?: JsonSchema) {
+    constructor(config: ToolConfig<'json_schema'>) {
         super({
             id: 'json_schema',
             displayName: 'JSON schema',
             category: ToolCategory.Schema,
             contextType: ToolContextType.Full,
         });
-        this.validator = schema === undefined ? undefined : z.fromJSONSchema(schema);
+        this.validator = z.fromJSONSchema(config.schema as JsonSchema);
     }
 
     override run(context: NormalizedRequest): ToolResult {
-        if (!this.validator) {
-            return {
-                tool: this.tool,
-                status: 'ERROR',
-                verdict: 'ERROR',
-                evidence: { reason: 'no_schema_configured' },
-            };
-        }
-
         const result = this.validator.safeParse(context.body);
         if (result.success) {
             return { tool: this.tool, status: 'SUCCESS', verdict: 'SAFE', evidence: undefined };

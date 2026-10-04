@@ -23,34 +23,34 @@ describe('JEV evaluation fixture', () => {
         }
     });
 
-    it('runs through static analysis with no tool errors', () => {
-        const broken = fixture.cases
-            .map((c, index) => ({ name: c.name, verdict: runStatic(c, index, fixture).verdict.verdict }))
-            .filter(({ verdict }) => verdict === 'ERROR');
+    it('runs through static analysis with no tool errors', async () => {
+        const outcomes = [];
+        for (const [index, c] of fixture.cases.entries()) outcomes.push({ name: c.name, verdict: (await runStatic(c, index, fixture)).verdict.verdict });
+        const broken = outcomes.filter(({ verdict }) => verdict === 'ERROR');
 
         expect(broken).toEqual([]);
     });
 
-    it('fires every static tool at least once', () => {
+    it('fires every static tool at least once', async () => {
         const fired = new Set<string>();
-        fixture.cases.forEach((c, index) => toolsFired(c, index, fixture).forEach((id) => fired.add(id)));
+        for (const [index, c] of fixture.cases.entries()) (await toolsFired(c, index, fixture)).forEach((id) => fired.add(id));
 
         // string_length is a policy limit no endpoint in the fixture opts into.
         const expected = ALL_TOOL_IDS.filter((id) => id !== 'string_length');
         expect(expected.filter((id) => !fired.has(id))).toEqual([]);
     });
 
-    it('keeps the final static outcome the case is built to show', () => {
-        const verdictOf = (name: string) => {
+    it('keeps the final static outcome the case is built to show', async () => {
+        const verdictOf = async (name: string) => {
             const index = fixture.cases.findIndex((c) => c.name === name);
-            return runStatic(fixture.cases[index], index, fixture).verdict.verdict;
+            return (await runStatic(fixture.cases[index], index, fixture)).verdict.verdict;
         };
 
-        expect(verdictOf('plain registration')).toBe('SAFE');
-        expect(verdictOf('keyword login union select')).toBe('SUSPICIOUS');
-        expect(verdictOf('oversized request body')).toBe('POLICY_VIOLATION');
-        expect(verdictOf('credential stuffing burst')).toBe('POLICY_VIOLATION');
-        expect(verdictOf('legit quick retry')).toBe('SUSPICIOUS');
-        expect(verdictOf('internal user plain login')).toBe('SUSPICIOUS');
+        expect(await verdictOf('plain registration')).toBe('SAFE');
+        expect(await verdictOf('keyword login union select')).toBe('SUSPICIOUS');
+        expect(await verdictOf('oversized request body')).toBe('POLICY_VIOLATION');
+        expect(await verdictOf('credential stuffing burst')).toBe('POLICY_VIOLATION');
+        expect(await verdictOf('legit quick retry')).toBe('SUSPICIOUS');
+        expect(await verdictOf('internal user plain login')).toBe('SUSPICIOUS');
     });
 });

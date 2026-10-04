@@ -1,14 +1,11 @@
-import { NormalizedRequest } from '@tessera/shared/contracts/Request';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 export default class CrossTenantViolation extends Tool<ToolContextType.Full> {
-    // hard-coded until we have enough infrastructure to support tool configuration
-    private static readonly TENANT_HEADER = 'x-tenant-id';
-    private static readonly TENANT_CLAIMS = ['tenant_id', 'tenantId', 'tid', 'tenant'];
     private static readonly MAX_TOKEN_LENGTH = 16384;
     private static readonly MAX_ECHO_LENGTH = 64;
 
-    constructor() {
+    constructor(private readonly config: ToolConfig<'cross_tenant_violation'>) {
         super({
             id: 'cross_tenant_violation',
             displayName: 'Cross-tenant violation',
@@ -18,7 +15,7 @@ export default class CrossTenantViolation extends Tool<ToolContextType.Full> {
     }
 
     override run(context: NormalizedRequest): ToolResult {
-        const headerValue = this.getHeader(context.headers, CrossTenantViolation.TENANT_HEADER);
+        const headerValue = this.getHeader(context.headers, this.config.tenantHeader);
         const token = this.getBearerToken(context.headers);
 
         // nothing to compare against
@@ -46,11 +43,11 @@ export default class CrossTenantViolation extends Tool<ToolContextType.Full> {
 
         // multiple X-Tenant-ID headers get comma-joined by most servers; which value wins is ambiguous
         if (headerValue.includes(',')) {
-            suspicious.push('multiple values in X-Tenant-ID header');
+            suspicious.push(`multiple values in ${this.config.tenantHeader} header`);
         }
 
         const claims = new Map<string, string>();
-        for (const name of CrossTenantViolation.TENANT_CLAIMS) {
+        for (const name of this.config.tenantClaims) {
             if (!(name in payload)) {
                 continue;
             }
@@ -74,7 +71,7 @@ export default class CrossTenantViolation extends Tool<ToolContextType.Full> {
         for (const [name, value] of claims) {
             if (value !== headerValue) {
                 violations.push(
-                    `X-Tenant-ID ${this.echo(headerValue)} does not match JWT claim "${name}" ${this.echo(value)}`,
+                    `${this.config.tenantHeader} ${this.echo(headerValue)} does not match JWT claim "${name}" ${this.echo(value)}`,
                 );
             }
         }

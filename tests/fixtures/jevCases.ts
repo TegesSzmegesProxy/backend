@@ -4,25 +4,10 @@ import type { FastifyRequest } from 'fastify';
 import { Normalizer } from '../../source/edge/normalizer';
 import { Runner, type ExecutionPlan, type ToolStep } from '../../source/core/static-analysis/runner';
 import { Aggregator, type StaticVerdict } from '../../source/core/static-analysis/aggregator';
-import { Tool, ToolContextType } from '../../source/core/static-analysis/shared';
-import type { NormalizedRequest, RequestFile } from '../../source/shared/contracts';
-import SqlInjection from '../../source/core/static-analysis/tools/injection/sqlinjection';
-import Xss from '../../source/core/static-analysis/tools/injection/xss';
-import CommandInjection from '../../source/core/static-analysis/tools/injection/commandinjection';
-import NullByte from '../../source/core/static-analysis/tools/injection/nullByte';
-import ControlCharacter from '../../source/core/static-analysis/tools/injection/controlCharacter';
-import Ssrf from '../../source/core/static-analysis/tools/url/ssrf';
-import UrlValidator from '../../source/core/static-analysis/tools/url/urlValidator';
-import TypeCheck from '../../source/core/static-analysis/tools/schema/typeCheck';
-import IntegerRange from '../../source/core/static-analysis/tools/schema/integerRange';
-import StringLength from '../../source/core/static-analysis/tools/schema/stringLength';
-import MimeType from '../../source/core/static-analysis/tools/schema/mimeType';
-import FileSize from '../../source/core/static-analysis/tools/resource/fileSize';
-import ArchiveExpansionRatio from '../../source/core/static-analysis/tools/resource/archiveExpantionRatio';
-import RequestSize from '../../source/core/static-analysis/tools/resource/requestSize';
-import RateLimit from '../../source/core/static-analysis/tools/resource/rateLimit';
-import PrivateIp from '../../source/core/static-analysis/tools/anomaly/privateIP';
-import DuplicateRequest from '../../source/core/static-analysis/tools/anomaly/duplicateRequest';
+import { Tool, ToolContextType, ToolState } from '../../source/core/static-analysis/shared';
+import type { NormalizedRequest, RequestFile, ToolId } from '../../source/shared/contracts';
+import { createTool } from '../../source/core/static-analysis';
+import { MemoryToolState } from '../support/memoryToolState';
 
 export const EVAL_TENANT = '3f2b8c1e4a5d4e6f8a7b9c0d';
 
@@ -70,26 +55,41 @@ type FieldTool = Tool<ToolContextType.Field>;
 type FileTool = Tool<ToolContextType.File>;
 type FullTool = Tool<ToolContextType.Full>;
 
+type ToolConfigs = Partial<Record<ToolId, Record<string, unknown>>>;
+
 /** Run on every field of every request. */
-const DEFAULT_FIELD_TOOLS: (new () => FieldTool)[] = [SqlInjection, Xss, CommandInjection, Ssrf, NullByte, ControlCharacter, TypeCheck];
-const EXTRA_FIELD_TOOLS: Record<string, new () => FieldTool> = {
-    url_validator: UrlValidator,
-    integer_range: IntegerRange,
-    string_length: class extends StringLength { constructor() { super({ minLength: 10 }); } },
+const DEFAULT_FIELD_TOOLS: ToolId[] = ['sql_injection', 'xss', 'command_injection', 'ssrf', 'null_byte', 'control_character', 'zod_type_check'];
+/** Field tools an endpoint opts into, with the configuration a compiled policy would give them. */
+const EXTRA_FIELD_TOOLS: ToolConfigs = {
+    url_validator: {},
+    integer_range: { min: 0, max: 100 },
+    string_length: { operator: '>=', length: 10 },
 };
-const FILE_TOOLS: Record<string, new () => FileTool> = {
-    file_size: FileSize,
-    mime_type: MimeType,
-    archive_expansion_ratio: ArchiveExpansionRatio,
+const FILE_TOOLS: ToolConfigs = {
+    file_size: {},
+    mime_type: {},
+    archive_expansion_ratio: {},
 };
-/** Run on every request. One shared instance each, so rate and duplicate state carries across requests as in the proxy. */
-const REQUEST_TOOLS: FullTool[] = [new PrivateIp(), new DuplicateRequest(), new RateLimit(), new RequestSize()];
+/** Stands in for Redis: rate and duplicate state carries across requests (and cases) as in the proxy. */
+const toolState = new MemoryToolState();
+const stateFor = (id: string): ToolState => new ToolState(toolState.stores, id);
+
+/** Run on every request. */
+const REQUEST_TOOLS = (['private_ip', 'duplicate_request', 'rate_limit', 'request_size'] as const).map((id) => createTool(id, {}, stateFor(id)) as FullTool);
 
 /** Ids of every tool the fixture can exercise. */
 export const ALL_TOOL_IDS: string[] = [
-    ...[...DEFAULT_FIELD_TOOLS, ...Object.values(EXTRA_FIELD_TOOLS), ...Object.values(FILE_TOOLS)].map((Tool) => new Tool().tool),
+    ...DEFAULT_FIELD_TOOLS,
+    ...Object.keys(EXTRA_FIELD_TOOLS),
+    ...Object.keys(FILE_TOOLS),
     ...REQUEST_TOOLS.map((tool) => tool.tool),
 ];
+
+function configured(tools: ToolConfigs, id: string): Tool<ToolContextType> {
+    const config = tools[id as ToolId];
+    if (!config) throw new Error(`Fixture uses unknown tool ${id}`);
+    return createTool(id as ToolId, config, stateFor(id));
+}
 
 export function loadFixture(): Fixture {
     return JSON.parse(readFileSync(resolve(__dirname, 'jev-cases.json'), 'utf8'));
@@ -135,14 +135,14 @@ export function planFor(request: NormalizedRequest, policy: EndpointPolicy): Exe
         const target = `${field.location}.${name}`;
         // zod_type_check only knows JSON types, so a policy type such as "url" is checked by its own tool instead.
         const zodKnowsType = policy.declared[name] !== 'url';
-        for (const Tool of DEFAULT_FIELD_TOOLS) {
-            if (Tool === TypeCheck && !zodKnowsType) continue;
-            plan.push({ tool: new Tool(), target });
+        for (const id of DEFAULT_FIELD_TOOLS) {
+            if (id === 'zod_type_check' && !zodKnowsType) continue;
+            plan.push({ tool: createTool(id, {}, stateFor(id)) as FieldTool, target });
         }
-        for (const id of policy.extraTools?.[name] ?? []) plan.push({ tool: new EXTRA_FIELD_TOOLS[id](), target });
+        for (const id of policy.extraTools?.[name] ?? []) plan.push({ tool: configured(EXTRA_FIELD_TOOLS, id) as FieldTool, target });
     }
     for (const field of [...new Set(request.files.map((file) => file.field))]) {
-        for (const id of policy.fileTools ?? []) plan.push({ tool: new FILE_TOOLS[id](), target: field });
+        for (const id of policy.fileTools ?? []) plan.push({ tool: configured(FILE_TOOLS, id) as FileTool, target: field });
     }
     for (const tool of REQUEST_TOOLS) plan.push({ tool });
     return plan;
@@ -160,6 +160,7 @@ export function buildRequest(testCase: EvalCase, index: number, fixture: Fixture
         url: path,
         ip: testCase.clientIp ?? defaultClientIp(index),
         headers: {},
+        raw: { rawHeaders: [], httpVersion: '1.1' },
         query: testCase.query ?? {},
         body: expandValue(testCase.body),
     } as unknown as FastifyRequest;
@@ -175,7 +176,7 @@ export interface StaticOutcome {
 }
 
 /** Sends the case through the real static pipeline; repeats run too, so rate and duplicate tools see them. */
-export function runStatic(testCase: EvalCase, index: number, fixture: Fixture): StaticOutcome {
+export async function runStatic(testCase: EvalCase, index: number, fixture: Fixture): Promise<StaticOutcome> {
     const runner = new Runner();
     const aggregator = new Aggregator();
     const policy = fixture.endpoints[testCase.endpoint];
@@ -183,7 +184,7 @@ export function runStatic(testCase: EvalCase, index: number, fixture: Fixture): 
     let outcome!: StaticOutcome;
     for (let attempt = 0; attempt < (testCase.repeat ?? 1); attempt++) {
         const request = buildRequest(testCase, index, fixture, attempt);
-        const results = runner.run(request, planFor(request, policy));
+        const results = await runner.run(request, planFor(request, policy));
         outcome = {
             request,
             verdict: aggregator.aggregate(results),
@@ -196,13 +197,13 @@ export function runStatic(testCase: EvalCase, index: number, fixture: Fixture): 
 }
 
 /** Tool ids that returned anything but SAFE for any attempt of the case. */
-export function toolsFired(testCase: EvalCase, index: number, fixture: Fixture): Set<string> {
+export async function toolsFired(testCase: EvalCase, index: number, fixture: Fixture): Promise<Set<string>> {
     const runner = new Runner();
     const policy = fixture.endpoints[testCase.endpoint];
     const fired = new Set<string>();
     for (let attempt = 0; attempt < (testCase.repeat ?? 1); attempt++) {
         const request = buildRequest(testCase, index, fixture, attempt);
-        for (const result of runner.run(request, planFor(request, policy))) {
+        for (const result of await runner.run(request, planFor(request, policy))) {
             if (result.verdict !== 'SAFE') fired.add(result.tool);
         }
     }

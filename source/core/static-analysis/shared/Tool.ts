@@ -7,6 +7,9 @@ export enum ToolCategory {
     Url = 'url',
     Resource = 'resource',
     Anomaly = 'anomaly',
+    Protocol = 'protocol',
+    Bot = 'bot',
+    DataLeakage = 'data_leakage',
 }
 
 export enum ToolContextType {
@@ -40,7 +43,8 @@ export interface ContextMap {
 export abstract class Tool<C extends ToolContextType> {
     constructor (public metadata: ToolMetadata<C>) {}
 
-    abstract run(context: ContextMap[C]): ToolResult;
+    /** Tools that keep state across requests (in Redis) are async; the others answer synchronously. */
+    abstract run(context: ContextMap[C]): ToolResult | Promise<ToolResult>;
 
     get tool() {
         return this.metadata.id;

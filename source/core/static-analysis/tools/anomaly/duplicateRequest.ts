@@ -1,5 +1,5 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
-import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
+import { ExpiringMap, Tool, ToolCategory, ToolContextType, ToolResult, ToolState } from '@tessera/core/static-analysis/shared';
 
 interface SeenRequest {
     requestId: string;
@@ -9,25 +9,21 @@ interface SeenRequest {
 }
 
 export default class DuplicateRequest extends Tool<ToolContextType.Full> {
-    // hard-coded until we have enough infrastructure to support tool configuration
-    private static readonly WINDOW_MS = 10_000;
-    private static readonly MAX_ENTRIES = 100_000;
+    // (Redis, per tenant) endpoint|hash -> most recent sighting; it expires windowMs after the last one.
+    private readonly seen: ExpiringMap<SeenRequest>;
 
-    // key -> most recent sighting. Per instance: the plan must reuse one instance across requests.
-    private readonly seen = new Map<string, SeenRequest>();
-    private lastSweep = 0;
-
-    constructor () {
+    constructor (private readonly config: ToolConfig<'duplicate_request'>, state: ToolState) {
         super({
             id: 'duplicate_request',
             displayName: 'Duplicate request',
             category: ToolCategory.Anomaly,
             contextType: ToolContextType.Full,
         });
+        this.seen = state.expiring<SeenRequest>('seen', config.windowMs);
     }
 
-    override run(context: NormalizedRequest): ToolResult {
-        const { WINDOW_MS } = DuplicateRequest;
+    override async run(context: NormalizedRequest): Promise<ToolResult> {
+        const { windowMs } = this.config;
 
         // without a hash we can't compare requests, which is different from "not a duplicate"
         if (typeof context.requestHash !== 'string' || context.requestHash === '') {
@@ -40,12 +36,10 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
         }
 
         const now = Date.now();
-        const key = `${context.tenantId}|${context.endpoint}|${context.requestHash}`;
+        const key = `${context.endpoint}|${context.requestHash}`;
 
-        this.sweep(now);
-
-        const previous = this.seen.get(key);
-        const inWindow = previous !== undefined && now - previous.lastSeen <= WINDOW_MS;
+        const previous = await this.seen.get(context.tenantId, key);
+        const inWindow = previous !== undefined && now - previous.lastSeen <= windowMs;
 
         // Same requestId means the pipeline is analyzing the same request again (retry, re-run),
         // not the client sending it twice, so it is neither recorded nor flagged.
@@ -57,10 +51,7 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
             ? { requestId: context.requestId, firstSeen: previous.firstSeen, lastSeen: now, count: previous.count + 1 }
             : { requestId: context.requestId, firstSeen: now, lastSeen: now, count: 1 };
 
-        // delete + set moves the key to the end of the Map, so insertion order stays "oldest sighting first"
-        this.seen.delete(key);
-        this.seen.set(key, entry);
-        this.evictOverflow();
+        await this.seen.set(context.tenantId, key, entry);
 
         if (entry.count > 1) {
             return {
@@ -72,7 +63,7 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
                     endpoint: context.endpoint,
                     count: entry.count,
                     firstSeenMsAgo: now - entry.firstSeen,
-                    windowMs: WINDOW_MS,
+                    windowMs,
                 },
             };
         }
@@ -87,30 +78,5 @@ export default class DuplicateRequest extends Tool<ToolContextType.Full> {
             verdict: 'SAFE',
             evidence: undefined,
         };
-    }
-
-    // Removes expired entries, at most once per window, so the map can't grow forever.
-    private sweep(now: number): void {
-        if (now - this.lastSweep < DuplicateRequest.WINDOW_MS) {
-            return;
-        }
-        this.lastSweep = now;
-
-        for (const [key, entry] of this.seen) {
-            if (now - entry.lastSeen > DuplicateRequest.WINDOW_MS) {
-                this.seen.delete(key);
-            }
-        }
-    }
-
-    // Hard cap in case a flood of unique hashes arrives between sweeps; evicts the oldest sightings first.
-    private evictOverflow(): void {
-        while (this.seen.size > DuplicateRequest.MAX_ENTRIES) {
-            const oldest = this.seen.keys().next();
-            if (oldest.done) {
-                return;
-            }
-            this.seen.delete(oldest.value);
-        }
     }
 }

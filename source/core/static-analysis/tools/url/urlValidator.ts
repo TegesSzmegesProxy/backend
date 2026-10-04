@@ -1,12 +1,5 @@
-import { RequestField } from '@tessera/shared/contracts';
+import { RequestField, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
-
-// hard-coded until we have enough infrastructure to support tool configuration
-const MAX_LENGTH = 2048;
-const ALLOWED_PROTOCOLS = new Set(['http:', 'https:']);
-
-// Declared field types this tool applies to. Adjust to the vocabulary your normalizer uses.
-const URL_TYPES = new Set(['url', 'uri']);
 
 // Require an explicit "scheme://" up front. The WHATWG parser is lenient and also accepts
 // "http:example.com" and "http:\\example.com", which most consumers would not treat as valid.
@@ -16,13 +9,20 @@ const EXPLICIT_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 const FORBIDDEN_CHARS = /[\u0000-\u0020\u007f-\u009f]/;
 
 export default class UrlValidator extends Tool<ToolContextType.Field> {
-    constructor() {
+    // URL.protocol values ("https:") of the allowed schemes
+    private readonly allowedProtocols: ReadonlySet<string>;
+    // declared field types this tool applies to; empty means every string field the step targets
+    private readonly urlTypes: ReadonlySet<string>;
+
+    constructor(private readonly config: ToolConfig<'url_validator'>) {
         super({
             id: 'url_validator',
             displayName: 'URL validator',
             category: ToolCategory.Url,
             contextType: ToolContextType.Field,
         });
+        this.allowedProtocols = new Set(config.allowedSchemes.map(scheme => `${scheme}:`));
+        this.urlTypes = new Set(config.urlTypes.map(type => type.toLowerCase()));
     }
 
     override run(context: RequestField): ToolResult {
@@ -30,11 +30,11 @@ export default class UrlValidator extends Tool<ToolContextType.Field> {
 
         // Only fields declared as URLs are validated; other strings are not expected to be URLs.
         // Non-strings are a type mismatch, which TypeCheck reports.
-        if (!URL_TYPES.has(declared) || typeof context.value !== 'string') {
+        if ((this.urlTypes.size > 0 && !this.urlTypes.has(declared)) || typeof context.value !== 'string') {
             return UrlValidator.safe(this.tool);
         }
 
-        const reason = UrlValidator.validate(context.value);
+        const reason = this.validate(context.value);
 
         if (reason) {
             return {
@@ -49,9 +49,9 @@ export default class UrlValidator extends Tool<ToolContextType.Field> {
     }
 
     // Returns the first rule the value breaks, or undefined when it is a valid URL.
-    private static validate(value: string): string | undefined {
+    private validate(value: string): string | undefined {
         if (value.length === 0) return 'empty';
-        if (value.length > MAX_LENGTH) return 'too_long';
+        if (value.length > this.config.maxLength) return 'too_long';
         if (FORBIDDEN_CHARS.test(value)) return 'forbidden_characters';
         if (!EXPLICIT_SCHEME.test(value)) return 'missing_scheme';
 
@@ -62,7 +62,7 @@ export default class UrlValidator extends Tool<ToolContextType.Field> {
             return 'unparseable';
         }
 
-        if (!ALLOWED_PROTOCOLS.has(url.protocol)) return 'disallowed_scheme';
+        if (!this.allowedProtocols.has(url.protocol)) return 'disallowed_scheme';
         if (url.hostname === '') return 'missing_host';
         if (url.username || url.password) return 'embedded_credentials';
 

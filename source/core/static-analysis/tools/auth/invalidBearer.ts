@@ -1,12 +1,7 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 type Severity = 'POLICY_VIOLATION' | 'SUSPICIOUS';
-
-// hard-coded until we have enough infrastructure to support tool configuration
-const MAX_TOKEN_LENGTH = 4096;
-const CLOCK_SKEW_SECONDS = 60;
-const ALLOWED_ALGORITHMS = new Set(['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512', 'EdDSA', 'HS256']);
 
 // RFC 6750 token68: letters, digits and - . _ ~ + / with optional trailing "=" padding.
 const TOKEN68 = /^[A-Za-z0-9._~+/-]+=*$/;
@@ -35,13 +30,16 @@ const SEVERITY: Record<string, Severity> = {
 };
 
 export default class InvalidBearer extends Tool<ToolContextType.Full> {
-    constructor() {
+    private readonly allowedAlgorithms: ReadonlySet<string>;
+
+    constructor(private readonly config: ToolConfig<'invalid_bearer'>) {
         super({
             id: 'invalid_bearer',
             displayName: 'Invalid bearer token',
             category: ToolCategory.Auth,
             contextType: ToolContextType.Full,
         });
+        this.allowedAlgorithms = new Set(config.allowedAlgorithms);
     }
 
     override run(context: NormalizedRequest): ToolResult {
@@ -53,7 +51,7 @@ export default class InvalidBearer extends Tool<ToolContextType.Full> {
             return InvalidBearer.safe(this.tool);
         }
 
-        const { rules, alg } = InvalidBearer.analyze(header.slice('bearer'.length));
+        const { rules, alg } = this.analyze(header.slice('bearer'.length));
 
         if (rules.length > 0) {
             const violation = rules.some(rule => SEVERITY[rule] === 'POLICY_VIOLATION');
@@ -69,23 +67,23 @@ export default class InvalidBearer extends Tool<ToolContextType.Full> {
         return InvalidBearer.safe(this.tool);
     }
 
-    private static analyze(rest: string): { rules: string[]; alg?: string } {
+    private analyze(rest: string): { rules: string[]; alg?: string } {
         // leading spaces are allowed between scheme and token (RFC 7235); anything else is not
         const token = rest.replace(/^ +/, '').replace(/ +$/, '');
 
         if (token === '') return { rules: ['missing_token'] };
         if (/\s/.test(token)) return { rules: ['whitespace_in_token'] };
-        if (token.length > MAX_TOKEN_LENGTH) return { rules: ['too_long'] };
+        if (token.length > this.config.maxTokenLength) return { rules: ['too_long'] };
         if (!TOKEN68.test(token)) return { rules: ['invalid_characters'] };
         if (PLACEHOLDERS.has(token.toLowerCase())) return { rules: ['placeholder_token'] };
 
         // Exactly two dots means a compact JWS (header.payload.signature). Anything else is treated as an
         // opaque token, which has no structure to check beyond the rules above.
         const parts = token.split('.');
-        return parts.length === 3 ? InvalidBearer.analyzeJwt(parts) : { rules: [] };
+        return parts.length === 3 ? this.analyzeJwt(parts) : { rules: [] };
     }
 
-    private static analyzeJwt([headerPart, payloadPart, signaturePart]: string[]): { rules: string[]; alg?: string } {
+    private analyzeJwt([headerPart, payloadPart, signaturePart]: string[]): { rules: string[]; alg?: string } {
         const header = InvalidBearer.decode(headerPart);
         const payload = InvalidBearer.decode(payloadPart);
 
@@ -100,7 +98,7 @@ export default class InvalidBearer extends Tool<ToolContextType.Full> {
             rules.push('malformed_jwt');
         } else if (rawAlg.toLowerCase() === 'none') {
             rules.push('alg_none');
-        } else if (!ALLOWED_ALGORITHMS.has(rawAlg)) {
+        } else if (!this.allowedAlgorithms.has(rawAlg)) {
             rules.push('unexpected_alg');
         }
 
@@ -118,7 +116,7 @@ export default class InvalidBearer extends Tool<ToolContextType.Full> {
         if (exp !== undefined) {
             if (typeof exp !== 'number' || !Number.isFinite(exp)) {
                 rules.push('invalid_claim');
-            } else if (exp + CLOCK_SKEW_SECONDS < now) {
+            } else if (exp + this.config.clockSkewSeconds < now) {
                 rules.push('expired');
             }
         }
@@ -127,7 +125,7 @@ export default class InvalidBearer extends Tool<ToolContextType.Full> {
         if (nbf !== undefined) {
             if (typeof nbf !== 'number' || !Number.isFinite(nbf)) {
                 rules.push('invalid_claim');
-            } else if (nbf - CLOCK_SKEW_SECONDS > now) {
+            } else if (nbf - this.config.clockSkewSeconds > now) {
                 rules.push('not_yet_valid');
             }
         }

@@ -1,8 +1,14 @@
 import { createHash, createPublicKey, verify, type KeyObject } from "node:crypto";
 import { z } from "zod";
+import { TOOL_REGISTRY_V2, isToolId, toolContract } from "./tools";
 
 export const BUNDLE_SCHEMA = "tessera.bundle/v2";
-export const TOOL_REGISTRY = "tessera.tools/v1";
+/** The first registry: `string_length` only. Still accepted, so dashboards that only compile v1 keep working. */
+export const TOOL_REGISTRY_V1 = "tessera.tools/v1";
+/** The newest registry this proxy executes; see TOOL_CONTRACTS and docs/tool-registry.json. */
+export const TOOL_REGISTRY = TOOL_REGISTRY_V2;
+/** Every registry this proxy executes, newest first (sent as Tessera-Tool-Registries). */
+export const SUPPORTED_TOOL_REGISTRIES = [TOOL_REGISTRY_V2, TOOL_REGISTRY_V1] as const;
 export const HEARTBEAT_SCHEMA = "tessera.heartbeat/v1";
 export const TELEMETRY_SCHEMA = "tessera.telemetry/v1";
 export const JEV_CREDENTIAL_SCHEMA = "tessera.jev-credential/v1";
@@ -13,16 +19,41 @@ const hash = z.string().regex(/^[a-f0-9]{64}$/);
 const tenantId = z.string().regex(/^[a-f0-9]{24}$/);
 const path = z.string().regex(/^\/(?!.*[?#\s]).*$/).max(1024);
 const method = z.enum(["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]);
+const V1_TOOLS: ReadonlySet<string> = new Set(["string_length"]);
 
+/** What a step's target names: "body.x" / "query.x" for a field tool, the upload field for a file tool, nothing for the full request. */
+const TARGETS = {
+  field: /^(body|query)\.[^\s]+$/,
+  file: /^[^\s]+$/,
+} as const;
+
+// The tool, context type, target and configuration of every step are checked against the tool's contract, so a
+// bundle naming an unknown tool or a configuration the proxy can't execute is rejected before anything runs.
 const step = z.strictObject({
-  toolId: z.literal("string_length"),
-  contextType: z.literal("field"),
-  target: z.string().regex(/^(body|query)\.[^\s]+$/).max(512),
-  config: z.strictObject({
-    minLength: z.number().int().min(0).max(1_000_000).optional(),
-    maxLength: z.number().int().min(0).max(1_000_000).optional(),
-  }).refine((value) => value.minLength !== undefined || value.maxLength !== undefined)
-    .refine((value) => value.minLength === undefined || value.maxLength === undefined || value.minLength <= value.maxLength),
+  toolId: z.string().min(1).max(64),
+  contextType: z.enum(["field", "file", "full"]),
+  target: z.string().min(1).max(512).optional(),
+  config: z.record(z.string(), z.unknown()),
+}).superRefine((value, context) => {
+  if (!isToolId(value.toolId)) {
+    context.addIssue({ code: "custom", path: ["toolId"], message: `Unknown tool: ${value.toolId.slice(0, 64)}` });
+    return;
+  }
+  const contract = toolContract(value.toolId);
+  if (value.contextType !== contract.contextType) {
+    context.addIssue({ code: "custom", path: ["contextType"], message: `${contract.id} runs on ${contract.contextType} context` });
+  }
+  if (contract.contextType === "full") {
+    if (value.target !== undefined) context.addIssue({ code: "custom", path: ["target"], message: "Whole-request tools take no target" });
+  } else if (value.target === undefined || !TARGETS[contract.contextType].test(value.target)) {
+    context.addIssue({ code: "custom", path: ["target"], message: `${contract.id} needs a ${contract.contextType} target` });
+  }
+  const config = contract.config.safeParse(value.config);
+  if (!config.success) {
+    for (const issue of config.error.issues) {
+      context.addIssue({ code: "custom", path: ["config", ...issue.path], message: issue.message });
+    }
+  }
 });
 
 const runtimeConfig = z.strictObject({
@@ -62,12 +93,19 @@ export const signedBundleSchema = z.strictObject({
   runtimeConfig,
   policy: z.strictObject({
     schemaVersion: z.literal("tessera.policy/v1"),
-    toolRegistryVersion: z.literal(TOOL_REGISTRY),
+    toolRegistryVersion: z.enum(SUPPORTED_TOOL_REGISTRIES),
     endpoints: z.array(z.strictObject({
       method,
       path,
       steps: z.array(step).min(1).max(100),
     })).min(1).max(500),
+  }).superRefine((policy, context) => {
+    if (policy.toolRegistryVersion !== TOOL_REGISTRY_V1) return;
+    policy.endpoints.forEach((endpoint, endpointIndex) => endpoint.steps.forEach((value, stepIndex) => {
+      if (!V1_TOOLS.has(value.toolId)) {
+        context.addIssue({ code: "custom", path: ["endpoints", endpointIndex, "steps", stepIndex, "toolId"], message: `${value.toolId} needs ${TOOL_REGISTRY_V2}` });
+      }
+    }));
   }),
   issuedAt: z.iso.datetime(),
   signature: z.strictObject({
@@ -78,6 +116,7 @@ export const signedBundleSchema = z.strictObject({
 });
 
 export type SignedBundle = z.infer<typeof signedBundleSchema>;
+export type PolicyStep = z.infer<typeof step>;
 
 /** Canonical JSON compatible with the dashboard's signed JSON payload. */
 export function canonicalJson(value: unknown): string {

@@ -1,18 +1,13 @@
-import { NormalizedRequest } from '@tessera/shared/contracts/Request';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 export default class CookieAbuse extends Tool<ToolContextType.Full> {
-    // hard-coded until we have enough infrastructure to support tool configuration
-    private static readonly MAX_HEADER_BYTES = 4096;
-    private static readonly MAX_COOKIE_COUNT = 50;
-    private static readonly MAX_COOKIE_VALUE_BYTES = 4096;
-
     // RFC 6265 cookie-name is an RFC 2616 token
     private static readonly TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
     // control characters other than horizontal tab (CR, LF, NUL, etc.)
     private static readonly CONTROL_CHARS = /[\x00-\x08\x0A-\x1F\x7F]/;
 
-    constructor() {
+    constructor(private readonly config: ToolConfig<'cookie_abuse'>) {
         super({
             id: 'cookie_abuse',
             displayName: 'Cookie abuse',
@@ -36,9 +31,10 @@ export default class CookieAbuse extends Tool<ToolContextType.Full> {
         const violations: string[] = [];
         const suspicious: string[] = [];
 
+        const { maxHeaderBytes, maxCookieCount, maxCookieValueBytes } = this.config;
         const headerBytes = Buffer.byteLength(header, 'utf8');
-        if (headerBytes > CookieAbuse.MAX_HEADER_BYTES) {
-            violations.push(`cookie header size ${headerBytes} > ${CookieAbuse.MAX_HEADER_BYTES}`);
+        if (headerBytes > maxHeaderBytes) {
+            violations.push(`cookie header size ${headerBytes} > ${maxHeaderBytes}`);
         }
 
         if (CookieAbuse.CONTROL_CHARS.test(header)) {
@@ -47,8 +43,8 @@ export default class CookieAbuse extends Tool<ToolContextType.Full> {
 
         const pairs = header.split(';').map(p => p.trim()).filter(p => p.length > 0);
 
-        if (pairs.length > CookieAbuse.MAX_COOKIE_COUNT) {
-            violations.push(`cookie count ${pairs.length} > ${CookieAbuse.MAX_COOKIE_COUNT}`);
+        if (pairs.length > maxCookieCount) {
+            violations.push(`cookie count ${pairs.length} > ${maxCookieCount}`);
         }
 
         const seen = new Set<string>();
@@ -77,8 +73,8 @@ export default class CookieAbuse extends Tool<ToolContextType.Full> {
             seen.add(name);
 
             const valueBytes = Buffer.byteLength(value, 'utf8');
-            if (valueBytes > CookieAbuse.MAX_COOKIE_VALUE_BYTES) {
-                violations.push(`cookie "${name}" value size ${valueBytes} > ${CookieAbuse.MAX_COOKIE_VALUE_BYTES}`);
+            if (valueBytes > maxCookieValueBytes) {
+                violations.push(`cookie "${name}" value size ${valueBytes} > ${maxCookieValueBytes}`);
             }
         }
 

@@ -27,13 +27,14 @@ the dashboard before the first proxy start. A previously activated v1 bundle
 must be reactivated with explicit decision settings to produce v2.
 
 The v2 runtime configuration carries sampling bounds, JEV threshold and floor,
-and separate behaviors for static-analysis errors and unavailable JEV. Policy
-targets use `body.<field>` or `query.<field>`. Policy endpoint keys use
+and separate behaviors for static-analysis errors and unavailable JEV. Field
+targets use `body.<field>` or `query.<field>`; file targets name the upload field. Policy endpoint keys use
 `METHOD /path`; `:name` matches exactly one nonempty path segment. The
 `routing.pathPrefix` is removed before policy matching and upstream forwarding.
 Paths are matched without decoding, and a trailing slash is significant.
-The supported tool registry and remaining prototype-tool inventory are in
-[docs/tool-registry-inventory.md](docs/tool-registry-inventory.md).
+The supported tools and their configuration contracts are described in
+[docs/tool-registry-inventory.md](docs/tool-registry-inventory.md) and listed in
+[docs/tool-registry.json](docs/tool-registry.json).
 The versioned network schemas live in [source/shared/contracts](source/shared/contracts).
 
 The proxy checks for a newer bundle once per minute and reports that a restart

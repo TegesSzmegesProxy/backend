@@ -1,22 +1,10 @@
-import { RequestField } from '@tessera/shared/contracts';
+import { RequestField, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 interface Analysis {
     rules: string[];
     host?: string;
 }
-
-// hard-coded until we have enough infrastructure to support tool configuration
-// Hosts a redirect may point to. Subdomains are allowed too ("app.example.com" matches "example.com").
-const ALLOWED_HOSTS = ['example.com'];
-
-// Fields that normally hold a redirect target, compared after lowercasing and removing "_" and "-".
-// A generic "url" is left out on purpose: most URL fields are not redirects, and UrlValidator/Ssrf cover them.
-const REDIRECT_FIELDS = new Set([
-    'redirect', 'redirecturi', 'redirecturl', 'redirectto', 'return', 'returnto', 'returnurl', 'returnuri',
-    'returnpath', 'next', 'nexturl', 'continue', 'dest', 'destination', 'goto', 'forward', 'target', 'callback',
-    'callbackurl', 'successurl', 'failureurl', 'cancelurl', 'back', 'backurl', 'rurl', 'postlogin', 'postlogout',
-]);
 
 // Schemes that execute code or read local content when a browser follows them.
 const DANGEROUS_SCHEMES = new Set(['javascript', 'data', 'vbscript', 'file', 'blob']);
@@ -25,21 +13,25 @@ const SCHEME = /^([a-z][a-z0-9+.-]*):/i;
 const MAX_DECODE_ROUNDS = 3;
 
 export default class OpenRedirect extends Tool<ToolContextType.Field> {
-    constructor() {
+    // fields that normally hold a redirect target, compared after lowercasing and removing "_" and "-"
+    private readonly redirectFields: ReadonlySet<string>;
+
+    constructor(private readonly config: ToolConfig<'open_redirect'>) {
         super({
             id: 'open_redirect',
             displayName: 'Open redirect',
             category: ToolCategory.Url,
             contextType: ToolContextType.Field,
         });
+        this.redirectFields = new Set(config.redirectFields);
     }
 
     override run(context: RequestField): ToolResult {
-        if (typeof context.value !== 'string' || !OpenRedirect.isRedirectField(context.name)) {
+        if (typeof context.value !== 'string' || !this.isRedirectField(context.name)) {
             return OpenRedirect.safe(this.tool);
         }
 
-        const { rules, host } = OpenRedirect.analyze(context.value);
+        const { rules, host } = this.analyze(context.value);
 
         if (rules.length > 0) {
             return {
@@ -59,12 +51,12 @@ export default class OpenRedirect extends Tool<ToolContextType.Field> {
     }
 
     // "returnUrl", "user[return_url]" and "redirect-to" all count; only the last path segment is compared.
-    private static isRedirectField(name: unknown): boolean {
+    private isRedirectField(name: unknown): boolean {
         if (typeof name !== 'string') {
             return false;
         }
         const last = name.split(/[[\].]+/).filter(Boolean).pop() ?? '';
-        return REDIRECT_FIELDS.has(last.toLowerCase().replace(/[_-]/g, ''));
+        return this.redirectFields.has(last.toLowerCase().replace(/[_-]/g, ''));
     }
 
     // Folds the value the way a browser would before following it: percent-decoding (redirect targets are
@@ -90,7 +82,7 @@ export default class OpenRedirect extends Tool<ToolContextType.Field> {
             .replace(/\\/g, '/');
     }
 
-    private static analyze(raw: string): Analysis {
+    private analyze(raw: string): Analysis {
         const value = OpenRedirect.normalizeTarget(raw);
         if (value === '') {
             return { rules: [] };
@@ -126,7 +118,7 @@ export default class OpenRedirect extends Tool<ToolContextType.Field> {
         const rules: string[] = [];
         const host = url.hostname.toLowerCase().replace(/\.$/, '');
 
-        if (!OpenRedirect.isAllowedHost(host)) {
+        if (!this.isAllowedHost(host)) {
             rules.push(protocolRelative ? 'protocol_relative_url' : 'external_host');
 
             // https:/evil.com and https:evil.com: not a proper "scheme://", yet browsers and parsers follow it
@@ -143,8 +135,9 @@ export default class OpenRedirect extends Tool<ToolContextType.Field> {
         return { rules, host };
     }
 
-    private static isAllowedHost(host: string): boolean {
-        return ALLOWED_HOSTS.some(allowed => host === allowed || host.endsWith(`.${allowed}`));
+    // subdomains are allowed too ("app.example.com" matches "example.com")
+    private isAllowedHost(host: string): boolean {
+        return this.config.allowedHosts.some(allowed => host === allowed || host.endsWith(`.${allowed}`));
     }
 
     private static safe(tool: string): ToolResult {

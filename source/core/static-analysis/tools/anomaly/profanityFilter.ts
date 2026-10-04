@@ -1,13 +1,5 @@
-import { RequestField } from '@tessera/shared/contracts';
+import { RequestField, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
-
-// hard-coded until we have enough infrastructure to support tool configuration
-// A small seed list of common English profanity. Extend it, or load a maintained list, for real use.
-const TERMS = [
-    'fuck', 'motherfucker', 'shit', 'bullshit', 'horseshit', 'shithead', 'dipshit', 'bitch', 'bastard',
-    'asshole', 'arsehole', 'dumbass', 'jackass', 'dickhead', 'cunt', 'piss', 'wanker', 'twat',
-    'douchebag', 'bollocks',
-];
 
 // Endings that still count as the term: fucking, fucker, shitty, bitches, pissed, ...
 const SUFFIXES = ['s', 'es', 'ed', 'er', 'ers', 'ing', 'y'];
@@ -16,32 +8,31 @@ const SUFFIXES = ['s', 'es', 'ed', 'er', 'ers', 'ing', 'y'];
 const LEET: Record<string, string> = { '0': 'o', '1': 'i', '3': 'e', '4': 'a', '5': 's', '7': 't' };
 
 const MAX_MATCHES = 10;
-const MAX_WORDS = 5000;
 
 // "fuuuuck" -> "fuck", "bullshit" -> "bulshit". Applied to both the input and the terms, so repeated
 // letters can't be used to dodge the list.
 const collapse = (text: string): string => text.replace(/(.)\1+/g, '$1');
 
-// collapsed term -> original term
-const COLLAPSED_TERMS = new Map(TERMS.map(term => [collapse(term), term] as const));
-
-// Whole-word match with an optional ending. Anchored on both sides, so words that merely contain a term
-// ("Scunthorpe", "shiitake", "assassin") never match. No g flag, so .exec has no lastIndex state.
-const WORD_PATTERN = new RegExp(`^(${[...COLLAPSED_TERMS.keys()].join('|')})(?:${SUFFIXES.join('|')})?$`);
-
-// Every term with every ending, used for masked words such as "f*ck" and "sh*tty".
-const MASKED_FORMS = TERMS.flatMap(term =>
-    ['', ...SUFFIXES].map(suffix => ({ form: term + suffix, term })),
-);
-
 export default class ProfanityFilter extends Tool<ToolContextType.Field> {
-    constructor() {
+    // collapsed term -> original term
+    private readonly collapsedTerms: Map<string, string>;
+    // Whole-word match with an optional ending. Anchored on both sides, so words that merely contain a term
+    // ("Scunthorpe", "shiitake", "assassin") never match. No g flag, so .exec has no lastIndex state.
+    private readonly wordPattern: RegExp;
+    // Every term with every ending, used for masked words such as "f*ck" and "sh*tty".
+    private readonly maskedForms: { form: string; term: string }[];
+
+    constructor(private readonly config: ToolConfig<'profanity_filter'>) {
         super({
             id: 'profanity_filter',
             displayName: 'Profanity filter',
             category: ToolCategory.Anomaly, // there is no content category yet, so this is the closest fit
             contextType: ToolContextType.Field,
         });
+        // terms are lowercase letters only (see the contract), so they are safe to join into a pattern
+        this.collapsedTerms = new Map(config.terms.map(term => [collapse(term), term] as const));
+        this.wordPattern = new RegExp(`^(${[...this.collapsedTerms.keys()].join('|')})(?:${SUFFIXES.join('|')})?$`);
+        this.maskedForms = config.terms.flatMap(term => ['', ...SUFFIXES].map(suffix => ({ form: term + suffix, term })));
     }
 
     override run(context: RequestField): ToolResult {
@@ -49,14 +40,14 @@ export default class ProfanityFilter extends Tool<ToolContextType.Field> {
             return ProfanityFilter.safe(this.tool);
         }
 
-        const words = ProfanityFilter.words(ProfanityFilter.normalize(context.value));
+        const words = ProfanityFilter.words(ProfanityFilter.normalize(context.value), this.config.maxWords);
         const candidates = [...words, ...ProfanityFilter.joinSpacedLetters(words)];
 
         const matches = new Set<string>();
         for (const candidate of candidates) {
             const term = candidate.includes('*')
-                ? ProfanityFilter.matchMasked(candidate)
-                : ProfanityFilter.matchPlain(candidate);
+                ? this.matchMasked(candidate)
+                : this.matchPlain(candidate);
             if (term) {
                 matches.add(term);
             }
@@ -92,12 +83,12 @@ export default class ProfanityFilter extends Tool<ToolContextType.Field> {
             .replace(/[@$](?=[a-z0-9@$])/g, symbol => (symbol === '@' ? 'a' : 's'));
     }
 
-    private static words(text: string): string[] {
+    private static words(text: string, maxWords: number): string[] {
         return text
             .split(/[^a-z0-9*]+/)
             .map(word => word.replace(/^\*+|\*+$/g, '')) // markdown emphasis like *word* is not a mask
             .filter(Boolean)
-            .slice(0, MAX_WORDS)
+            .slice(0, maxWords)
             .map(word => (/[a-z]/.test(word) ? word.replace(/[013457]/g, digit => LEET[digit]) : word));
     }
 
@@ -123,19 +114,19 @@ export default class ProfanityFilter extends Tool<ToolContextType.Field> {
         return joined;
     }
 
-    private static matchPlain(word: string): string | undefined {
-        const match = WORD_PATTERN.exec(collapse(word));
-        return match ? COLLAPSED_TERMS.get(match[1]) : undefined;
+    private matchPlain(word: string): string | undefined {
+        const match = this.wordPattern.exec(collapse(word));
+        return match ? this.collapsedTerms.get(match[1]) : undefined;
     }
 
     // "f*ck": the * stands for any single character. Needs at least two real letters and one mask.
-    private static matchMasked(word: string): string | undefined {
+    private matchMasked(word: string): string | undefined {
         const letters = word.replace(/\*/g, '').length;
         if (letters < 2 || letters === word.length) {
             return undefined;
         }
 
-        return MASKED_FORMS.find(({ form }) =>
+        return this.maskedForms.find(({ form }) =>
             form.length === word.length
             && [...word].every((char, index) => char === '*' || char === form[index]),
         )?.term;

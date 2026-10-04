@@ -47,6 +47,33 @@ class TenantRedis {
   recent(name: string): Promise<string[]> {
     return this.client.lRange(this.key(name), 0, -1);
   }
+
+  /** Like `set`, with a time-to-live in milliseconds. */
+  async setPx(name: string, value: string, ttlMs: number): Promise<void> {
+    await this.client.set(this.key(name), value, { PX: ttlMs });
+  }
+
+  /**
+   * Adds `member` at time `at` to a sorted-set sliding window, drops entries older than `windowMs` and all but the
+   * newest `maxEntries`, and returns what is left (oldest first). One MULTI, so concurrent proxies see a consistent window.
+   */
+  async windowAdd(name: string, at: number, member: string, windowMs: number, maxEntries: number): Promise<{ member: string; at: number }[]> {
+    const key = this.key(name);
+    const replies = await this.client.multi()
+      .zAdd(key, { score: at, value: member })
+      .zRemRangeByScore(key, "-inf", `(${at - windowMs}`)
+      .zRemRangeByRank(key, 0, -(maxEntries + 1))
+      .pExpire(key, windowMs)
+      .zRangeWithScores(key, 0, -1)
+      .exec();
+    return (replies[4] as unknown as { value: string; score: number }[]).map(({ value, score }) => ({ member: value, at: score }));
+  }
+
+  /** Sliding-window entries at or after `since`, oldest first, without changing the window. */
+  async windowRange(name: string, since: number): Promise<{ member: string; at: number }[]> {
+    const entries = await this.client.zRangeByScoreWithScores(this.key(name), since, "+inf");
+    return entries.map(({ value, score }) => ({ member: value, at: score }));
+  }
 }
 
 export { TenantRedis };

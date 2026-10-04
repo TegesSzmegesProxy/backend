@@ -1,8 +1,8 @@
-import { RequestFile } from '@tessera/shared/contracts';
+import { RequestFile, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 export default class FileSize extends Tool<ToolContextType.File> {
-    constructor() {
+    constructor(private readonly config: ToolConfig<'file_size'>) {
         super({
             id: 'file_size',
             displayName: 'File size',
@@ -12,7 +12,7 @@ export default class FileSize extends Tool<ToolContextType.File> {
     }
 
     override run(context: RequestFile): ToolResult {
-        const maxBytes = 5 * 1024 * 1024; // 5 MiB, hard-coded until we have enough infrastructure to support tool configuration
+        const { maxBytes } = this.config;
 
         // A size we can't trust means we can't evaluate the file, which is different from "safe"
         if (typeof context.size !== 'number' || !Number.isFinite(context.size) || context.size < 0) {

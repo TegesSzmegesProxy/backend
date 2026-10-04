@@ -1,7 +1,7 @@
 import { readFile, mkdir, open, rename, unlink } from "node:fs/promises";
 import { dirname } from "node:path";
 import { randomUUID } from "node:crypto";
-import { BUNDLE_SCHEMA, TOOL_REGISTRY, BundleVerifier, type SignedBundle } from "../../shared/contracts/bundle";
+import { BUNDLE_SCHEMA, SUPPORTED_TOOL_REGISTRIES, BundleVerifier, type SignedBundle } from "../../shared/contracts/bundle";
 
 export type BundleSource = "remote" | "last_known_good";
 
@@ -82,7 +82,7 @@ export class BundleManager {
       headers: {
         Authorization: `Bearer ${this.options.deploymentKey}`,
         "Tessera-Bundle-Schemas": BUNDLE_SCHEMA,
-        "Tessera-Tool-Registries": TOOL_REGISTRY,
+        "Tessera-Tool-Registries": SUPPORTED_TOOL_REGISTRIES.join(", "),
         ...(ifNoneMatch ? { "If-None-Match": ifNoneMatch } : {}),
       },
       signal: AbortSignal.timeout(5000),

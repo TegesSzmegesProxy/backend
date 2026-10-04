@@ -1,8 +1,8 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 export default class RequestSize extends Tool<ToolContextType.Full> {
-    constructor() {
+    constructor(private readonly config: ToolConfig<'request_size'>) {
         super({
             id: 'request_size',
             displayName: 'Request size',
@@ -12,7 +12,7 @@ export default class RequestSize extends Tool<ToolContextType.Full> {
     }
 
     override run(context: NormalizedRequest): ToolResult {
-        const maxBytes = 1024 * 1024; // 1 MiB, hard-coded until we have enough infrastructure to support tool configuration
+        const { maxBytes } = this.config;
 
         let jsonBytes: number;
         try {

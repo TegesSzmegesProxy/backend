@@ -5,6 +5,8 @@
 - **Upstream**: the protected application server behind Tessera.
 - **Normalized request**: the canonical, parsed form of a raw request used by analysis.
 - **Tool**: a deterministic check (schema, resource, injection, url, file-magic) that produces a tool result.
+- **Tool contract**: a tool's id, metadata and configuration schema, shared by the proxy and the control plane. A policy configures a tool only through its contract.
+- **Tool registry**: the versioned set of tool contracts the proxy executes (`tessera.tools/v2`), published as `docs/tool-registry.json`.
 - **Static verdict**: the aggregated result of all tools: `SAFE`, `SUSPICIOUS`, `POLICY_VIOLATION`, or `ERROR`.
 - **Sampling (N)**: the percentage of `SAFE` requests sent to JEV.
 - **Threshold (T)**: the tenant-set threshold applied to the JEV attack probability, with a floor (`T_floor`) it may tighten to under attack. Independent of N.

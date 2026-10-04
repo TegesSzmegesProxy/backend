@@ -1,8 +1,8 @@
-import { RequestField } from '@tessera/shared/contracts';
+import { RequestField, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 export default class IntegerRange extends Tool<ToolContextType.Field> {
-    constructor() {
+    constructor(private readonly config: ToolConfig<'integer_range'>) {
         super({
             id: 'integer_range',
             displayName: 'Integer range',
@@ -12,11 +12,10 @@ export default class IntegerRange extends Tool<ToolContextType.Field> {
     }
 
     override run(context: RequestField): ToolResult {
-        const min = 0; // hard-coded until we have enough infrastructure to support tool configuration
-        const max = 100; // inclusive bounds, also hard-coded for now
+        const { min, max } = this.config; // inclusive; either may be unset
 
         if (typeof context.value === 'number' && Number.isInteger(context.value)) {
-            if (context.value < min || context.value > max) {
+            if ((min !== undefined && context.value < min) || (max !== undefined && context.value > max)) {
                 return {
                     tool: this.tool,
                     status: 'SUCCESS',

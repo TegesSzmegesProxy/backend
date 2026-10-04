@@ -74,7 +74,7 @@ const base = (c: EvalCase) => ({ name: c.name, label: c.label, category: c.categ
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 async function evalDirect(c: EvalCase, index: number, fixture: Fixture, jev: JevClient, runs: number): Promise<Row> {
-    const outcome = runStatic(c, index, fixture);
+    const outcome = await runStatic(c, index, fixture);
     const common = { ...base(c), static: outcome.verdict.verdict, hits: outcome.hits };
     if (outcome.verdict.verdict === 'POLICY_VIOLATION') return { ...common, decidedBy: 'static' };
     if (outcome.verdict.verdict === 'ERROR') return { ...common, decidedBy: 'error', note: 'static analysis error' };

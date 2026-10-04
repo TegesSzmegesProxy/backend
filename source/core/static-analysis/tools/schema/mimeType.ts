@@ -1,17 +1,5 @@
-import { RequestFile } from '@tessera/shared/contracts';
+import { RequestFile, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
-
-// hard-coded until we have enough infrastructure to support tool configuration
-const ALLOWED_MIME_TYPES = new Set([
-    'image/png',
-    'image/jpeg',
-    'image/gif',
-    'image/webp',
-    'application/pdf',
-    'text/plain',
-    'text/csv',
-    'application/json',
-]);
 
 // Hex prefixes of file content for each declared type. Types with no fixed signature
 // (text/plain, text/csv, application/json) are not listed and are not signature-checked.
@@ -31,13 +19,16 @@ const EXECUTABLE_SIGNATURES = [
 ];
 
 export default class MimeType extends Tool<ToolContextType.File> {
-    constructor() {
+    private readonly allowedTypes: ReadonlySet<string>;
+
+    constructor(config: ToolConfig<'mime_type'>) {
         super({
             id: 'mime_type',
             displayName: 'MIME type',
             category: ToolCategory.Schema,
             contextType: ToolContextType.File,
         });
+        this.allowedTypes = new Set(config.allowedTypes);
     }
 
     override run(context: RequestFile): ToolResult {
@@ -55,7 +46,7 @@ export default class MimeType extends Tool<ToolContextType.File> {
         // "Text/Plain; charset=UTF-8" -> "text/plain"
         const normalized = declared.split(';')[0].trim().toLowerCase();
 
-        if (!ALLOWED_MIME_TYPES.has(normalized)) {
+        if (!this.allowedTypes.has(normalized)) {
             return {
                 tool: this.tool,
                 status: 'SUCCESS',

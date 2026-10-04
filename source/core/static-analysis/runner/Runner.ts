@@ -9,17 +9,18 @@ export type ToolStep =
 export type ExecutionPlan = ToolStep[];
 
 export class Runner {
-    run(request: NormalizedRequest, plan: ExecutionPlan): ToolResult[] {
-        const results: ToolResult[] = [];
+    /** Runs every step concurrently; results keep plan order. */
+    async run(request: NormalizedRequest, plan: ExecutionPlan): Promise<ToolResult[]> {
+        const pending: Promise<ToolResult>[] = [];
 
         for (const step of plan) {
             for (const context of this.resolveContexts(request, step)) {
-                const result = this.execute(step.tool, context);
-                results.push('target' in step ? { ...result, target: step.target } : result);
+                pending.push(this.execute(step.tool, context)
+                    .then(result => ('target' in step ? { ...result, target: step.target } : result)));
             }
         }
 
-        return results;
+        return Promise.all(pending);
     }
 
     private resolveContexts(request: NormalizedRequest, step: ToolStep): ContextMap[ToolContextType][] {
@@ -33,9 +34,10 @@ export class Runner {
         }
     }
 
-    private execute(tool: Tool<ToolContextType>, context: ContextMap[ToolContextType]): ToolResult {
+    // A throw or a rejected promise (e.g. Redis unavailable for a stateful tool) is an ERROR, never SAFE.
+    private async execute(tool: Tool<ToolContextType>, context: ContextMap[ToolContextType]): Promise<ToolResult> {
         try {
-            return tool.run(context as never);
+            return await tool.run(context as never);
         } catch (error) {
             return {
                 tool: tool.tool,

@@ -20,7 +20,8 @@
     "dev": "nodemon --exec tsx ./source/bootstrap.ts",
     "analyze:mock": "tsx ./scripts/environment-mock.ts",
     "eval:jev": "tsx --env-file=.env ./scripts/jev-eval.ts",
-    "mock:upstream": "tsx ./scripts/mock-upstream.ts"
+    "mock:upstream": "tsx ./scripts/mock-upstream.ts",
+    "tools:registry": "tsx ./scripts/generate-tool-registry.ts"
   },
   "dependencies": {
     "@eslint/js": "^9.39.5",

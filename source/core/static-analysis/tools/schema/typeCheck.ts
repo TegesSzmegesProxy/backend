@@ -1,18 +1,13 @@
 import { z } from 'zod';
-import { RequestField } from '@tessera/shared/contracts';
+import { RequestField, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
-// hard-coded until we have enough infrastructure to support tool configuration
 const TYPE_ALIASES: Record<string, string> = {
     int: 'integer',
     float: 'number',
     double: 'number',
     bool: 'boolean',
 };
-
-// Locations where the transport only carries text, so "42" is a legitimate integer.
-// Adjust to the values RequestField.location actually takes.
-const STRING_ENCODED_LOCATIONS = new Set(['query', 'header', 'headers', 'path', 'cookie', 'form']);
 
 // Strict schemas, used everywhere (including JSON bodies).
 const STRICT_SCHEMAS: Record<string, z.ZodTypeAny> = {
@@ -25,7 +20,7 @@ const STRICT_SCHEMAS: Record<string, z.ZodTypeAny> = {
     null: z.null(),
 };
 
-// Text-encoded schemas, used in addition to the strict ones in STRING_ENCODED_LOCATIONS.
+// Text-encoded schemas, used in addition to the strict ones in the configured text-only locations.
 // Deliberately not z.coerce.*: coerce turns "" and null into 0 and any non-empty string into true.
 const STRING_ENCODED_SCHEMAS: Record<string, z.ZodTypeAny> = {
     integer: z.string().trim().regex(/^-?\d+$/),
@@ -34,17 +29,22 @@ const STRING_ENCODED_SCHEMAS: Record<string, z.ZodTypeAny> = {
 };
 
 export default class TypeCheck extends Tool<ToolContextType.Field> {
-    constructor() {
+    // locations where the transport only carries text, so "42" is a legitimate integer
+    private readonly textLocations: ReadonlySet<string>;
+
+    constructor(private readonly config: ToolConfig<'zod_type_check'>) {
         super({
             id: 'zod_type_check',
             displayName: 'Type check (Zod)',
             category: ToolCategory.Schema,
             contextType: ToolContextType.Field,
         });
+        this.textLocations = new Set(config.textLocations);
     }
 
     override run(context: RequestField): ToolResult {
-        const declared = typeof context.type === 'string' ? context.type.trim().toLowerCase() : '';
+        // the policy's declared type wins over the one the field arrived with
+        const declared = this.config.type ?? (typeof context.type === 'string' ? context.type.trim().toLowerCase() : '');
         const expected = TYPE_ALIASES[declared] ?? declared;
         const strict = STRICT_SCHEMAS[expected];
 
@@ -64,7 +64,7 @@ export default class TypeCheck extends Tool<ToolContextType.Field> {
         }
 
         const encoded = STRING_ENCODED_SCHEMAS[expected];
-        if (encoded && STRING_ENCODED_LOCATIONS.has(String(context.location).toLowerCase())) {
+        if (encoded && this.textLocations.has(String(context.location).toLowerCase())) {
             if (encoded.safeParse(context.value).success) {
                 return TypeCheck.safe(this.tool);
             }

@@ -1,4 +1,4 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 interface Rejected {
@@ -7,38 +7,32 @@ interface Rejected {
     reason: 'empty' | 'placeholder';
 }
 
-// hard-coded until we have enough infrastructure to support tool configuration
-// Endpoints that may be called without credentials. Everything else requires them (secure by default).
-// "/docs/*" matches "/docs" and everything below it. Replace these examples with your real public routes.
-const PUBLIC_ENDPOINTS = ['/', '/health', '/healthz', '/login', '/register', '/docs/*'];
-
-// Headers that carry a credential on their own, compared lowercased.
-const CREDENTIAL_HEADERS = new Set([
-    'x-api-key', 'api-key', 'apikey', 'x-auth-token', 'x-access-token', 'x-session-token', 'x-token',
-]);
-
-// Cookie names that carry a session or token, compared after lowercasing, removing a "__host-" or "__secure-"
-// prefix, and removing "_", "-" and ".". Add your own session cookie name.
-const CREDENTIAL_COOKIES = new Set([
-    'session', 'sessionid', 'sessid', 'sid', 'jsessionid', 'phpsessid', 'connectsid', 'laravelsession',
-    'token', 'accesstoken', 'authtoken', 'idtoken', 'jwt', 'auth', 'authorization',
-]);
-
-// Values clients send when a variable was never set: "Authorization: Bearer undefined".
-const PLACEHOLDERS = new Set(['null', 'undefined', 'nan', 'none', 'false', 'true', 'bearer', 'token', '[object object]']);
-
 const AUTHORIZATION_VALUE = /^([A-Za-z][A-Za-z0-9!#$%&'*+.^_`|~-]*)(?: +(.+))?$/;
 const MAX_DECODE_ROUNDS = 3;
 const MAX_COOKIES = 100;
 
 export default class MissingAuthentication extends Tool<ToolContextType.Full> {
-    constructor() {
+    // Paths that may be called without credentials; everything else requires them (secure by default).
+    // "/docs/*" matches "/docs" and everything below it.
+    private readonly publicEndpoints: readonly string[];
+    // headers that carry a credential on their own, compared lowercased
+    private readonly credentialHeaders: ReadonlySet<string>;
+    // cookie names compared after lowercasing, removing a "__host-" or "__secure-" prefix, and removing "_", "-" and "."
+    private readonly credentialCookies: ReadonlySet<string>;
+    // values clients send when a variable was never set: "Authorization: Bearer undefined"
+    private readonly placeholders: ReadonlySet<string>;
+
+    constructor(config: ToolConfig<'missing_authentication'>) {
         super({
             id: 'missing_authentication',
             displayName: 'Missing authentication',
             category: ToolCategory.Auth,
             contextType: ToolContextType.Full,
         });
+        this.publicEndpoints = config.publicEndpoints.map(entry => entry.toLowerCase());
+        this.credentialHeaders = new Set(config.credentialHeaders);
+        this.credentialCookies = new Set(config.credentialCookies);
+        this.placeholders = new Set(config.placeholders.map(value => value.toLowerCase()));
     }
 
     override run(context: NormalizedRequest): ToolResult {
@@ -55,12 +49,12 @@ export default class MissingAuthentication extends Tool<ToolContextType.Full> {
         const path = MissingAuthentication.normalizePath(context.endpoint);
 
         // a path that can't be normalized is never treated as public
-        if (path !== undefined && MissingAuthentication.isPublic(path)) {
+        if (path !== undefined && this.isPublic(path)) {
             return MissingAuthentication.safe(this.tool);
         }
 
         const rejected: Rejected[] = [];
-        if (MissingAuthentication.hasCredential(context.headers ?? {}, rejected)) {
+        if (this.hasCredential(context.headers ?? {}, rejected)) {
             return MissingAuthentication.safe(this.tool);
         }
 
@@ -79,7 +73,7 @@ export default class MissingAuthentication extends Tool<ToolContextType.Full> {
 
     // True when the request carries at least one credential that is present and not an obvious placeholder.
     // Whether the credential is valid is not decided here.
-    private static hasCredential(headers: Record<string, string>, rejected: Rejected[]): boolean {
+    private hasCredential(headers: Record<string, string>, rejected: Rejected[]): boolean {
         let found = false;
 
         for (const [rawName, value] of Object.entries(headers)) {
@@ -93,16 +87,16 @@ export default class MissingAuthentication extends Tool<ToolContextType.Full> {
                 const credentials = match?.[2]?.trim() ?? '';
                 if (credentials === '') {
                     rejected.push({ source: 'authorization', name, reason: 'empty' });
-                } else if (PLACEHOLDERS.has(credentials.toLowerCase())) {
+                } else if (this.placeholders.has(credentials.toLowerCase())) {
                     rejected.push({ source: 'authorization', name, reason: 'placeholder' });
                 } else {
                     found = true;
                 }
-            } else if (CREDENTIAL_HEADERS.has(name)) {
+            } else if (this.credentialHeaders.has(name)) {
                 const credential = value.trim();
                 if (credential === '') {
                     rejected.push({ source: 'header', name, reason: 'empty' });
-                } else if (PLACEHOLDERS.has(credential.toLowerCase())) {
+                } else if (this.placeholders.has(credential.toLowerCase())) {
                     rejected.push({ source: 'header', name, reason: 'placeholder' });
                 } else {
                     found = true;
@@ -116,14 +110,14 @@ export default class MissingAuthentication extends Tool<ToolContextType.Full> {
 
                     const cookieName = part.slice(0, separator).trim();
                     const normalized = cookieName.toLowerCase().replace(/^__(?:host|secure)-/, '').replace(/[_.-]/g, '');
-                    if (!CREDENTIAL_COOKIES.has(normalized)) {
+                    if (!this.credentialCookies.has(normalized)) {
                         continue;
                     }
 
                     const cookieValue = part.slice(separator + 1).trim().replace(/^"(.*)"$/, '$1');
                     if (cookieValue === '') {
                         rejected.push({ source: 'cookie', name: cookieName.slice(0, 100), reason: 'empty' });
-                    } else if (PLACEHOLDERS.has(cookieValue.toLowerCase())) {
+                    } else if (this.placeholders.has(cookieValue.toLowerCase())) {
                         rejected.push({ source: 'cookie', name: cookieName.slice(0, 100), reason: 'placeholder' });
                     } else {
                         found = true;
@@ -135,13 +129,13 @@ export default class MissingAuthentication extends Tool<ToolContextType.Full> {
         return found;
     }
 
-    private static isPublic(path: string): boolean {
-        return PUBLIC_ENDPOINTS.some(entry => {
+    private isPublic(path: string): boolean {
+        return this.publicEndpoints.some(entry => {
             if (entry.endsWith('/*')) {
-                const base = entry.slice(0, -2).toLowerCase();
+                const base = entry.slice(0, -2);
                 return path === base || path.startsWith(`${base}/`);
             }
-            return path === entry.toLowerCase();
+            return path === entry;
         });
     }
 

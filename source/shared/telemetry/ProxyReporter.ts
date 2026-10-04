@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Decision } from "../../core/decisionOrchestrator/orchestrator";
 import type { BundleManager } from "../../core/policy/BundleManager";
-import { BUNDLE_SCHEMA, HEARTBEAT_SCHEMA, TELEMETRY_SCHEMA, TOOL_REGISTRY } from "../contracts/bundle";
+import { BUNDLE_SCHEMA, HEARTBEAT_SCHEMA, SUPPORTED_TOOL_REGISTRIES, TELEMETRY_SCHEMA } from "../contracts/bundle";
 import { heartbeatSchema, telemetryBatchSchema } from "../contracts/operations";
 
 interface EndpointCounters {
@@ -79,7 +79,7 @@ export class ProxyReporter {
         instanceId: this.instanceId,
         proxyVersion: this.options.proxyVersion,
         supportedBundleSchemas: [BUNDLE_SCHEMA],
-        supportedToolRegistries: [TOOL_REGISTRY],
+        supportedToolRegistries: [...SUPPORTED_TOOL_REGISTRIES],
         health: status.dashboardReachable ? "ok" : "degraded",
         tenants: [{ tenantId: this.options.tenantId, bundleSource: status.source, loadedBundleVersion: this.bundles.snapshot.version }],
       }));

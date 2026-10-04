@@ -1,0 +1,5309 @@
+{
+  "registryVersion": "tessera.tools/v2",
+  "tools": [
+    {
+      "id": "additional_properties",
+      "displayName": "Additional properties",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Rejects top-level JSON body properties the endpoint does not declare.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "properties": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Top-level body properties the endpoint accepts; anything else is undeclared."
+          }
+        },
+        "required": [
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "array_uniqueness",
+      "displayName": "Array uniqueness",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Rejects repeated items in body arrays that must be unique (votes, coupon codes).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "properties": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Top-level body properties holding arrays whose items must be unique."
+          }
+        },
+        "required": [
+          "properties"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "duplicate_json_keys",
+      "displayName": "Duplicate JSON keys",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Rejects JSON bodies that repeat a key in one object, which parsers resolve differently.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "enum_validation",
+      "displayName": "Enum validation",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects field values outside the allowed set (exact, case-sensitive match).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "values": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 256
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "values"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "file_name_validation",
+      "displayName": "File name validation",
+      "category": "schema",
+      "contextType": "file",
+      "description": "Rejects upload file names with path separators, reserved device names, control or invisible characters.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxLength": {
+            "default": 255,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "format_validation",
+      "displayName": "Format validation",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects string fields that do not match a well-known format.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "email",
+              "uuid",
+              "date",
+              "datetime",
+              "phone",
+              "iban",
+              "uri",
+              "postalcode",
+              "currency"
+            ]
+          }
+        },
+        "required": [
+          "format"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "integer_range",
+      "displayName": "Integer range",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects integer fields outside inclusive bounds.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "max": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "invalid_utf8",
+      "displayName": "Invalid UTF-8 and charset",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Rejects unexpected charsets, lone surrogates and noncharacters; flags replacement characters and UTF-7.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedCharsets": {
+            "default": [
+              "utf-8",
+              "utf8",
+              "us-ascii",
+              "ascii"
+            ],
+            "description": "Lowercase charsets a Content-Type may declare.",
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40,
+              "pattern": "^[a-z0-9._:-]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "json_schema",
+      "displayName": "JSON schema",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Validates the whole request body against a JSON Schema.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {}
+          }
+        },
+        "required": [
+          "schema"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "mime_type",
+      "displayName": "MIME type",
+      "category": "schema",
+      "contextType": "file",
+      "description": "Rejects uploads whose declared type is not allowed; flags content that does not match its type or is executable.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedTypes": {
+            "default": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp",
+              "application/pdf",
+              "text/plain",
+              "text/csv",
+              "application/json"
+            ],
+            "description": "Lowercase MIME types without parameters.",
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[a-z0-9!#$&^_.+-]+\\/[a-z0-9!#$&^_.+-]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "number_special_values",
+      "displayName": "Special number values",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects NaN, Infinity, negative zero, unsafe integers and numbers near overflow.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxMagnitude": {
+            "default": 1e+300,
+            "description": "Magnitudes above this overflow to Infinity after a multiplication or two.",
+            "type": "number",
+            "exclusiveMinimum": 0
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "openapi_conformance",
+      "displayName": "OpenAPI conformance",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Rejects query parameters the endpoint's API description does not document.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "queryParameters": {
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "description": "Query parameters the endpoint documents."
+          }
+        },
+        "required": [
+          "queryParameters"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "regex_pattern",
+      "displayName": "Allowlist pattern",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects scalar field values that do not match an allowlist pattern (always anchored to the whole value).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024
+          },
+          "flags": {
+            "default": "",
+            "type": "string",
+            "maxLength": 4,
+            "pattern": "^[imsu]*$"
+          },
+          "maxLength": {
+            "default": 1024,
+            "description": "Longer values are rejected without running the pattern, so backtracking can't be abused.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          }
+        },
+        "required": [
+          "pattern"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "required_fields",
+      "displayName": "Required fields",
+      "category": "schema",
+      "contextType": "full",
+      "description": "Rejects JSON bodies missing a required top-level property (null and blank strings count as missing).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "string_length",
+      "displayName": "String length",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects string fields whose length does not satisfy a comparison (length < N, length > N, length <= N or length >= N).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "operator": {
+                "type": "string",
+                "enum": [
+                  "<",
+                  ">",
+                  "<=",
+                  ">="
+                ],
+                "description": "How the value's length must compare to `length`: \"<=\" with 64 allows at most 64 characters."
+              },
+              "length": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            },
+            "required": [
+              "operator",
+              "length"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "minLength": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              },
+              "maxLength": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000
+              }
+            },
+            "additionalProperties": false,
+            "description": "Deprecated (tessera.tools/v1): inclusive bounds, the same as >= minLength and <= maxLength."
+          }
+        ]
+      }
+    },
+    {
+      "id": "type_coercion",
+      "displayName": "Type coercion",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Flags typed-body values sent as another type (\"true\" for true, \"1\" for 1) that backends coerce silently.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "expectedType": {
+            "type": "string",
+            "enum": [
+              "boolean",
+              "number",
+              "integer",
+              "string"
+            ]
+          },
+          "textLocations": {
+            "default": [
+              "query",
+              "header",
+              "headers",
+              "path",
+              "cookie",
+              "form"
+            ],
+            "description": "Locations whose transport only carries text, where \"42\" is the only way to send 42.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            }
+          }
+        },
+        "required": [
+          "expectedType"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "zod_type_check",
+      "displayName": "Type check (Zod)",
+      "category": "schema",
+      "contextType": "field",
+      "description": "Rejects field values that are not of the declared type; text-only locations may carry numbers and booleans as text.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "type": {
+            "description": "The declared type; omitted, the field's own declared type is used.",
+            "type": "string",
+            "enum": [
+              "string",
+              "integer",
+              "number",
+              "boolean",
+              "array",
+              "object",
+              "null"
+            ]
+          },
+          "textLocations": {
+            "default": [
+              "query",
+              "header",
+              "headers",
+              "path",
+              "cookie",
+              "form"
+            ],
+            "description": "Locations whose transport only carries text, where \"42\" is the only way to send 42.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "business_logic_tampering",
+      "displayName": "Business logic tampering",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Rejects negative quantities, prices and out-of-range discounts; flags totals below their line items.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "quantityFields": {
+            "default": [
+              "quantity",
+              "qty",
+              "count",
+              "units",
+              "amountofitems"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "priceFields": {
+            "default": [
+              "price",
+              "unitprice",
+              "amount",
+              "cost",
+              "subtotal",
+              "fee"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "totalFields": {
+            "default": [
+              "total",
+              "totalprice",
+              "totalamount",
+              "grandtotal",
+              "ordertotal"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "percentFields": {
+            "default": [
+              "discount",
+              "discountpercent",
+              "percentoff",
+              "rebate"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "maxQuantity": {
+            "default": 10000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "totalTolerance": {
+            "default": 0.01,
+            "description": "Rounding allowed between a total and its line items, in currency units.",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "content_type_mismatch",
+      "displayName": "Content-Type mismatch",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags bodies whose content does not match the declared Content-Type, or that have none.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "double_encoding",
+      "displayName": "Double encoding",
+      "category": "anomaly",
+      "contextType": "field",
+      "description": "Flags values that reveal filtered characters only after more than one round of percent-decoding.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "duplicate_request",
+      "displayName": "Duplicate request",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags the same request (by hash) sent again to the same endpoint within a window.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "windowMs": {
+            "default": 10000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "encoded_payload",
+      "displayName": "Encoded payload",
+      "category": "anomaly",
+      "contextType": "field",
+      "description": "Decodes base64, hex and percent-encoded blobs and re-scans them with the injection detectors.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "entropy_analysis",
+      "displayName": "Entropy analysis",
+      "category": "anomaly",
+      "contextType": "field",
+      "description": "Flags long values that look random (encrypted or encoded payloads) in fields meant for human text.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "minLength": {
+            "default": 32,
+            "description": "Shorter words can't carry a meaningful entropy estimate.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8192
+          },
+          "thresholds": {
+            "description": "Bits per character above which a value looks random, per character set.",
+            "default": {},
+            "type": "object",
+            "properties": {
+              "hex": {
+                "default": 3.7,
+                "type": "number",
+                "minimum": 0,
+                "maximum": 8
+              },
+              "base64": {
+                "default": 5,
+                "type": "number",
+                "minimum": 0,
+                "maximum": 8
+              },
+              "mixed": {
+                "default": 5.2,
+                "type": "number",
+                "minimum": 0,
+                "maximum": 8
+              }
+            },
+            "additionalProperties": false
+          },
+          "randomFields": {
+            "default": [
+              "password",
+              "passwd",
+              "token",
+              "accesstoken",
+              "refreshtoken",
+              "idtoken",
+              "csrf",
+              "csrftoken",
+              "xsrftoken",
+              "nonce",
+              "state",
+              "code",
+              "codeverifier",
+              "codechallenge",
+              "signature",
+              "sig",
+              "hash",
+              "apikey",
+              "secret",
+              "clientsecret",
+              "sessionid",
+              "captcha",
+              "recaptcharesponse",
+              "gcaptcharesponse",
+              "hcaptcharesponse",
+              "otp"
+            ],
+            "description": "Fields that are random by design (tokens, nonces, passwords).",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "honeypot_endpoint",
+      "displayName": "Honeypot endpoint",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Rejects any request to a decoy route no legitimate client calls.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Decoy routes. Omitted, every endpoint the step is attached to is a decoy.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "honeypot_field",
+      "displayName": "Honeypot field",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Rejects requests that fill in hidden form inputs a person never sees.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "fields": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "required": [
+          "fields"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "mass_assignment",
+      "displayName": "Mass assignment",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags state-changing requests that set privileged properties (role, balance, owner) on a record.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "privilegedFields": {
+            "default": [
+              "role",
+              "roles",
+              "isadmin",
+              "admin",
+              "issuperuser",
+              "superuser",
+              "isstaff",
+              "staff",
+              "permissions",
+              "privileges",
+              "scopes",
+              "groups",
+              "accesslevel",
+              "usertype",
+              "accounttype",
+              "verified",
+              "isverified",
+              "emailverified",
+              "phoneverified",
+              "approved",
+              "isapproved",
+              "balance",
+              "credit",
+              "credits",
+              "walletbalance",
+              "ownerid",
+              "owner",
+              "tenantid",
+              "organizationid",
+              "orgid",
+              "createdby",
+              "plan",
+              "subscriptiontier",
+              "ispremium",
+              "isbanned",
+              "locked",
+              "passwordhash",
+              "apikey",
+              "mfaenabled",
+              "twofactorenabled"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "method_anomaly",
+      "displayName": "HTTP method anomaly",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Rejects debugging and unknown HTTP methods, and methods a route does not accept.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "defaultMethods": {
+            "default": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ],
+            "description": "Methods accepted on routes without their own entry.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 20,
+              "pattern": "^[A-Z]+$"
+            }
+          },
+          "routes": {
+            "default": [],
+            "description": "Per-route methods; the most specific matching route wins.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "route": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                "methods": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 20,
+                    "pattern": "^[A-Z]+$"
+                  }
+                }
+              },
+              "required": [
+                "route",
+                "methods"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "method_override",
+      "displayName": "HTTP method override",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Rejects method overrides to dangerous or state-changing methods; flags any other override.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "overlong_utf8",
+      "displayName": "Overlong UTF-8",
+      "category": "anomaly",
+      "contextType": "field",
+      "description": "Rejects escaped overlong UTF-8 and encoded surrogates; flags other invalid escaped UTF-8.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "private_ip",
+      "displayName": "Private IP",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags clients connecting from private, loopback, link-local or other reserved addresses.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "profanity_filter",
+      "displayName": "Profanity filter",
+      "category": "anomaly",
+      "contextType": "field",
+      "description": "Rejects text containing listed terms, including leetspeak, masked, spaced and stretched spellings.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "terms": {
+            "default": [
+              "fuck",
+              "motherfucker",
+              "shit",
+              "bullshit",
+              "horseshit",
+              "shithead",
+              "dipshit",
+              "bitch",
+              "bastard",
+              "asshole",
+              "arsehole",
+              "dumbass",
+              "jackass",
+              "dickhead",
+              "cunt",
+              "piss",
+              "wanker",
+              "twat",
+              "douchebag",
+              "bollocks"
+            ],
+            "description": "Lowercase terms; common endings (s, ed, ing, ...) are matched automatically.",
+            "minItems": 1,
+            "maxItems": 5000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z]{2,40}$"
+            }
+          },
+          "maxWords": {
+            "default": 5000,
+            "description": "Words scanned per value.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "referer_anomaly",
+      "displayName": "Referer anomaly",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags requests to same-site routes that arrive without, or with a foreign, Origin or Referer.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedOrigins": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "Origins of the application's own pages."
+          },
+          "routes": {
+            "description": "Routes only the application's own pages call. Omitted, every endpoint the step is attached to.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          }
+        },
+        "required": [
+          "allowedOrigins"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "sequence_analysis",
+      "displayName": "Sequence analysis",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags clients that scan many endpoints or walk sequential ids within a window.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "windowMs": {
+            "default": 60000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "maxDistinctEndpoints": {
+            "default": 15,
+            "description": "More distinct endpoints than this from one client in the window is a scan.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "minSequence": {
+            "default": 5,
+            "description": "This many consecutive integer values on one endpoint is enumeration.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "timestamp_replay",
+      "displayName": "Timestamp replay",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Rejects signed requests with a stale, future or missing timestamp, or a reused nonce or signature.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxAgeMs": {
+            "default": 300000,
+            "description": "Signed requests older, or further in the future, than this are rejected.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "signedRoutes": {
+            "default": [],
+            "description": "Routes whose requests must be signed; elsewhere only requests carrying a signature header are checked.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "signatureHeaders": {
+            "default": [
+              "x-signature",
+              "x-hub-signature-256",
+              "x-request-signature",
+              "stripe-signature",
+              "x-webhook-signature"
+            ],
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          },
+          "timestampHeaders": {
+            "default": [
+              "x-timestamp",
+              "x-request-timestamp",
+              "x-signature-timestamp"
+            ],
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          },
+          "nonceHeaders": {
+            "default": [
+              "x-nonce",
+              "x-request-nonce"
+            ],
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "timing_anomaly",
+      "displayName": "Timing anomaly",
+      "category": "anomaly",
+      "contextType": "full",
+      "description": "Flags forms submitted faster than a person can fill them, and bursts of state-changing requests.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "formRoutes": {
+            "description": "Forms carrying a render time. Omitted, every endpoint the step is attached to.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "renderTimeFields": {
+            "default": [
+              "formrenderedat",
+              "formts",
+              "renderedat",
+              "formstartedat"
+            ],
+            "description": "Hidden field the form page fills with its render time (ms or s since epoch).",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "minFillMs": {
+            "default": 1500,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "maxClockSkewMs": {
+            "default": 5000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "minActionIntervalMs": {
+            "default": 250,
+            "description": "`fastActionsInARow` state-changing requests each less than this apart are a burst.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "fastActionsInARow": {
+            "default": 5,
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 1000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "unicode_normalization",
+      "displayName": "Unicode normalization",
+      "category": "anomaly",
+      "contextType": "field",
+      "description": "Flags text that turns into syntax or attack keywords under NFKC, and words mixing look-alike scripts.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "account_enumeration",
+      "displayName": "Account enumeration",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags, then rejects, one client probing many identities on login, sign-up or password-reset routes.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Routes that answer differently for existing and unknown accounts. Omitted, every attached endpoint.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 600000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "identities": {
+            "default": {
+              "suspicious": 15,
+              "block": 60
+            },
+            "description": "Distinct identities one client may probe in the window.",
+            "type": "object",
+            "properties": {
+              "suspicious": {
+                "default": 15,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "block": {
+                "default": 60,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "basic_auth_anomaly",
+      "displayName": "Authorization header anomaly",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects malformed Authorization headers and Basic auth outside the routes that allow it; flags unknown schemes.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "basicAuthRoutes": {
+            "default": [],
+            "description": "Routes that accept HTTP Basic authentication; it is rejected everywhere else.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "brute_force",
+      "displayName": "Brute force",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags, then rejects, repeated login attempts against one account.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Login endpoints. Omitted, every endpoint the step is attached to is a login endpoint.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 900000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "attempts": {
+            "default": {
+              "suspicious": 10,
+              "block": 30
+            },
+            "description": "Login attempts per account in the window.",
+            "type": "object",
+            "properties": {
+              "suspicious": {
+                "default": 10,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "block": {
+                "default": 30,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cookie_abuse",
+      "displayName": "Cookie abuse",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects oversized Cookie headers, too many cookies or oversized values; flags malformed and duplicate cookies.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxHeaderBytes": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "maxCookieCount": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxCookieValueBytes": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cookie_tampering",
+      "displayName": "Cookie tampering",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects signed cookies (express cookie-signature format) whose HMAC does not verify; flags unsigned and duplicate ones.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "secret": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 1024,
+            "description": "HMAC-SHA256 key the application signs cookies with. Distributed inside the signed bundle."
+          },
+          "signedCookies": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256,
+              "pattern": "^[^A-Z]+$"
+            },
+            "description": "Lowercase names of the cookies the application signs."
+          },
+          "maxCookieValueBytes": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "required": [
+          "secret",
+          "signedCookies"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "credential_stuffing",
+      "displayName": "Credential stuffing",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags, then rejects, one source (IP, client fingerprint or network) trying many accounts on login.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Login endpoints. Omitted, every endpoint the step is attached to is a login endpoint.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 600000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "limits": {
+            "description": "Distinct accounts per source in the window. A source without `block` is only ever suspicious.",
+            "default": {},
+            "type": "object",
+            "properties": {
+              "ip": {
+                "default": {
+                  "suspicious": 10,
+                  "block": 50
+                },
+                "type": "object",
+                "properties": {
+                  "suspicious": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "block": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "suspicious"
+                ],
+                "additionalProperties": false
+              },
+              "fingerprint": {
+                "default": {
+                  "suspicious": 30
+                },
+                "description": "User-Agent + Accept-Language + Accept-Encoding: shared by many real users, so suspicious only by default.",
+                "type": "object",
+                "properties": {
+                  "suspicious": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "block": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "suspicious"
+                ],
+                "additionalProperties": false
+              },
+              "asn": {
+                "default": {
+                  "suspicious": 100
+                },
+                "description": "Shared by everyone behind a carrier or cloud provider, so suspicious only by default.",
+                "type": "object",
+                "properties": {
+                  "suspicious": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  },
+                  "block": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1000000
+                  }
+                },
+                "required": [
+                  "suspicious"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "asnTable": {
+            "default": [],
+            "description": "Network ownership used for the per-ASN count; without entries that count is skipped.",
+            "maxItems": 100000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cidr": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "asn": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                }
+              },
+              "required": [
+                "cidr",
+                "asn"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "credentials_in_url",
+      "displayName": "Credentials in URL",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects passwords, API keys and tokens sent in the query string or as URL userinfo.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "secretParameters": {
+            "default": [
+              "password",
+              "passwd",
+              "pwd",
+              "pass",
+              "apikey",
+              "apisecret",
+              "accesstoken",
+              "authtoken",
+              "secret",
+              "clientsecret",
+              "privatekey",
+              "sessionid",
+              "sessiontoken",
+              "awssecretaccesskey",
+              "jwt",
+              "bearer"
+            ],
+            "description": "Query parameters that carry credentials. A generic \"token\" is left out: reset links legitimately use it.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cross_tenant_violation",
+      "displayName": "Cross-tenant violation",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects requests whose tenant header does not match the tenant claim of their bearer JWT.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tenantHeader": {
+            "default": "x-tenant-id",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+          },
+          "tenantClaims": {
+            "default": [
+              "tenant_id",
+              "tenantId",
+              "tid",
+              "tenant"
+            ],
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "csrf",
+      "displayName": "Cross-site request forgery (CSRF)",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects cookie-authenticated state changes that are cross-site, from a foreign origin, or lack a matching CSRF token.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedOrigins": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2048
+            },
+            "description": "Origins of the application's own pages."
+          },
+          "tokenHeaders": {
+            "default": [
+              "x-csrf-token",
+              "x-xsrf-token",
+              "csrf-token",
+              "x-csrftoken"
+            ],
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          },
+          "tokenFields": {
+            "default": [
+              "csrf",
+              "csrftoken",
+              "xsrftoken",
+              "authenticitytoken",
+              "csrfmiddlewaretoken"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "tokenCookies": {
+            "default": [
+              "xsrf-token",
+              "csrftoken",
+              "csrf-token",
+              "_csrf"
+            ],
+            "description": "Lowercase cookies holding the double-submit token.",
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        },
+        "required": [
+          "allowedOrigins"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "forced_browsing",
+      "displayName": "Forced browsing",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects unauthenticated requests to privileged routes; flags JWTs on them that name no privileged role.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Privileged routes. Omitted, every endpoint the step is attached to is privileged.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "privilegedRoles": {
+            "default": [
+              "admin",
+              "administrator",
+              "superuser",
+              "root",
+              "staff",
+              "ops",
+              "support"
+            ],
+            "description": "Lowercase roles, without a \"role_\" prefix, that may use privileged routes.",
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "impossible_travel",
+      "displayName": "Impossible travel",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags one account seen from two places further apart than anyone can travel in the time between.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "geoIp": {
+            "minItems": 1,
+            "maxItems": 100000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cidr": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "country": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                "city": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "lat": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "lon": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                }
+              },
+              "required": [
+                "cidr",
+                "country",
+                "city",
+                "lat",
+                "lon"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Geo-IP database: the location of each network."
+          },
+          "maxSpeedKmh": {
+            "default": 1000,
+            "description": "Faster than a passenger jet.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "minDistanceKm": {
+            "default": 500,
+            "description": "Nearby jumps are usually geo-IP noise.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 20100
+          },
+          "memoryMs": {
+            "default": 86400000,
+            "description": "How long an account's last location is remembered.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          }
+        },
+        "required": [
+          "geoIp"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "invalid_bearer",
+      "displayName": "Invalid bearer token",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects malformed, placeholder, expired or not-yet-valid bearer tokens; flags unexpected JWT algorithms and key references.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxTokenLength": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          },
+          "clockSkewSeconds": {
+            "default": 60,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "allowedAlgorithms": {
+            "default": [
+              "RS256",
+              "RS384",
+              "RS512",
+              "ES256",
+              "ES384",
+              "ES512",
+              "PS256",
+              "PS384",
+              "PS512",
+              "EdDSA",
+              "HS256"
+            ],
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+_-]{2,20}$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "jwt_header_abuse",
+      "displayName": "JWT header abuse",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags JWT headers built to attack the verifier: alg none or confusion, embedded or remote keys, kid injection, PBES2 abuse.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedAlgorithms": {
+            "default": [
+              "RS256",
+              "RS384",
+              "RS512",
+              "ES256",
+              "ES384",
+              "ES512",
+              "PS256",
+              "PS384",
+              "PS512"
+            ],
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+_-]{2,20}$"
+            }
+          },
+          "allowedTypes": {
+            "default": [
+              "jwt",
+              "at+jwt",
+              "jose"
+            ],
+            "description": "Lowercase \"typ\" values.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          "maxTokenLength": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          },
+          "maxHeaderLength": {
+            "default": 1024,
+            "description": "Base64url characters; real headers are usually under 200.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          },
+          "maxKidLength": {
+            "default": 256,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "maxPbes2Iterations": {
+            "default": 1000000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "jwt_header_attacks",
+      "displayName": "JWT header attacks",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects JWTs (bearer, cookies, fields) with alg none, algorithm confusion, kid injection, untrusted or embedded keys.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedAlgorithms": {
+            "default": [
+              "RS256",
+              "ES256"
+            ],
+            "description": "The algorithms the issuer signs with; anything else, HS256 included, is a confusion attempt.",
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9+_-]{2,20}$"
+            }
+          },
+          "trustedKeyHosts": {
+            "default": [],
+            "description": "Hosts a token may point to with jku/x5u.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9.-]+$"
+            }
+          },
+          "knownCritical": {
+            "default": [
+              "b64",
+              "exp"
+            ],
+            "description": "\"crit\" extensions the verifier understands.",
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "jwt_validation",
+      "displayName": "JWT validation",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Verifies bearer JWT signatures, issuer, audience and expiry against the issuer's public key.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "publicKey": {
+            "type": "string",
+            "maxLength": 16384,
+            "pattern": "^-----BEGIN [A-Z ]+-----",
+            "description": "PEM public key or certificate of the token issuer."
+          },
+          "issuer": {
+            "description": "Expected \"iss\"; omitted, any issuer is accepted.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "audience": {
+            "description": "Expected \"aud\"; omitted, any audience is accepted.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048
+          },
+          "clockToleranceSeconds": {
+            "default": 60,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3600
+          },
+          "maxTokenLength": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          },
+          "allowedAlgorithms": {
+            "default": [
+              "RS256",
+              "RS384",
+              "RS512",
+              "ES256",
+              "ES384",
+              "ES512",
+              "PS256",
+              "PS384",
+              "PS512"
+            ],
+            "description": "Asymmetric only: HS* next to a public key lets anyone sign with the public key as the secret.",
+            "minItems": 1,
+            "maxItems": 9,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "RS256",
+                "RS384",
+                "RS512",
+                "ES256",
+                "ES384",
+                "ES512",
+                "PS256",
+                "PS384",
+                "PS512"
+              ]
+            }
+          }
+        },
+        "required": [
+          "publicKey"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "missing_authentication",
+      "displayName": "Missing authentication",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects requests that carry no usable credential (header, API key or session cookie) outside public endpoints.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "publicEndpoints": {
+            "default": [],
+            "description": "Paths callable without credentials; \"/docs/*\" covers \"/docs\" and below. Attach the tool to protected endpoints only and leave this empty.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s*]*(?:\\/\\*)?$"
+            }
+          },
+          "credentialHeaders": {
+            "default": [
+              "x-api-key",
+              "api-key",
+              "apikey",
+              "x-auth-token",
+              "x-access-token",
+              "x-session-token",
+              "x-token"
+            ],
+            "description": "Lowercase headers that carry a credential on their own.",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          },
+          "credentialCookies": {
+            "default": [
+              "session",
+              "sessionid",
+              "sessid",
+              "sid",
+              "jsessionid",
+              "phpsessid",
+              "connectsid",
+              "laravelsession",
+              "token",
+              "accesstoken",
+              "authtoken",
+              "idtoken",
+              "jwt",
+              "auth",
+              "authorization"
+            ],
+            "description": "Session cookie names, lowercased without a __Host-/__Secure- prefix and without \"_\", \"-\" and \".\".",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "placeholders": {
+            "default": [
+              "null",
+              "undefined",
+              "nan",
+              "none",
+              "false",
+              "true",
+              "bearer",
+              "token",
+              "[object object]"
+            ],
+            "description": "Values clients send when a variable was never set (\"Bearer undefined\").",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "oauth_flow_validation",
+      "displayName": "OAuth flow validation",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects authorization requests with unregistered redirect URIs, weak state or missing PKCE, and callbacks reusing a state.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "authorizeRoutes": {
+            "default": [],
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "callbackRoutes": {
+            "default": [],
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "redirectUris": {
+            "default": [],
+            "description": "redirect_uri values registered for the client, matched exactly.",
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2048,
+              "format": "uri"
+            }
+          },
+          "stateMemoryMs": {
+            "default": 900000,
+            "description": "Longer than any authorization round trip.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "minStateLength": {
+            "default": 8,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 256
+          },
+          "requirePkce": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "otp_brute_force",
+      "displayName": "OTP brute force",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Rejects guessing one-time codes: too many distinct codes per account or per client.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Code verification endpoints. Omitted, every endpoint the step is attached to.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 600000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "maxGuessesPerAccount": {
+            "default": 5,
+            "description": "A 6-digit code survives 5 guesses with 99.9995% probability.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxGuessesPerClient": {
+            "default": 20,
+            "description": "The same client spreading guesses over several accounts.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "codeFields": {
+            "default": [
+              "code",
+              "otp",
+              "totp",
+              "mfacode",
+              "token",
+              "verificationcode",
+              "resetcode",
+              "pin"
+            ],
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "password_spraying",
+      "displayName": "Password spraying",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags one password tried against many accounts, or one client trying many accounts with few passwords.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Login endpoints. Omitted, every endpoint the step is attached to is a login endpoint.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 1800000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "accountsPerPassword": {
+            "default": 10,
+            "description": "One password tried against this many accounts, from anywhere.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "accountsPerClient": {
+            "default": 10,
+            "description": "One client trying this many accounts...",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "passwordsPerClient": {
+            "default": 3,
+            "description": "...with at most this many different passwords.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "passwordFields": {
+            "default": [
+              "password",
+              "passwd",
+              "pass",
+              "pwd"
+            ],
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "session_binding",
+      "displayName": "Session binding",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags a session that moves to another network, User-Agent or platform.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionTtlMs": {
+            "default": 43200000,
+            "description": "How long a session's binding is remembered.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "session_fixation",
+      "displayName": "Session fixation",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags session IDs supplied in the path, query or body, cookie planting payloads, and weak or duplicate session cookies.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionNames": {
+            "default": [
+              "sessionid",
+              "sessid",
+              "sid",
+              "session",
+              "sessionkey",
+              "sessiontoken",
+              "phpsessid",
+              "jsessionid",
+              "aspnetsessionid",
+              "connectsid",
+              "laravelsession",
+              "cfid",
+              "cftoken"
+            ],
+            "description": "Session parameter names, lowercased without \"_\", \"-\", \".\" and spaces. \"aspsessionid*\" is always matched by prefix.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "minSessionIdLength": {
+            "default": 16,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 512
+          },
+          "minDistinctChars": {
+            "default": 6,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "maxSessionIdLength": {
+            "default": 512,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16384
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "token_replay",
+      "displayName": "Single-use token replay",
+      "category": "auth",
+      "contextType": "full",
+      "description": "Flags a single-use token (reset link, magic link, verification code) used more than once.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Routes that consume single-use tokens. Omitted, every endpoint the step is attached to.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "memoryMs": {
+            "default": 86400000,
+            "description": "Longer than any reset link or magic link stays valid.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "tokenFields": {
+            "default": [
+              "token",
+              "code",
+              "resettoken",
+              "magictoken",
+              "verificationtoken",
+              "confirmationtoken",
+              "otp"
+            ],
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "minTokenLength": {
+            "default": 6,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1024
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "datacenter_asn",
+      "displayName": "Datacenter ASN",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags clients connecting from hosting and cloud networks rather than homes and phones.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "asnTable": {
+            "minItems": 1,
+            "maxItems": 100000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cidr": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "asn": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 4294967295
+                },
+                "org": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "hosting": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "cidr",
+                "asn",
+                "org",
+                "hosting"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Network ownership; `hosting` marks datacenter and cloud networks."
+          },
+          "serverToServerRoutes": {
+            "default": [],
+            "description": "Routes servers are expected to call (webhooks, metrics scrapers), where hosting traffic is normal.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          }
+        },
+        "required": [
+          "asnTable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "geo_policy",
+      "displayName": "Geo policy",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Rejects denied countries and countries a route does not allow; flags countries outside the expected set.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "geoIp": {
+            "minItems": 1,
+            "maxItems": 100000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cidr": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "country": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$"
+                },
+                "city": {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                "lat": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "lon": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                }
+              },
+              "required": [
+                "cidr",
+                "country",
+                "city",
+                "lat",
+                "lon"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "deny": {
+            "default": [],
+            "description": "Countries rejected everywhere.",
+            "maxItems": 250,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          },
+          "expected": {
+            "description": "Countries normally seen; others are suspicious. Omitted, no country is unusual.",
+            "maxItems": 250,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]{2}$"
+            }
+          },
+          "routes": {
+            "default": [],
+            "description": "Per-route allowlists; the most specific matching route wins.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "route": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                "allow": {
+                  "minItems": 1,
+                  "maxItems": 250,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^[A-Z]{2}$"
+                  }
+                }
+              },
+              "required": [
+                "route",
+                "allow"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "geoIp"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "header_order_fingerprint",
+      "displayName": "Header order fingerprint",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags clients claiming to be a browser whose header order and set match an HTTP library instead.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "headless_browser",
+      "displayName": "Headless browser",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags automation markers in the User-Agent, client hints and headers, and automation reported by the page.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "clientSignalFields": {
+            "default": [
+              "webdriver",
+              "navigatorwebdriver",
+              "headless",
+              "automation"
+            ],
+            "description": "Fields the application's client-side script fills when it detects automation (navigator.webdriver, ...).",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ip_reputation",
+      "displayName": "IP reputation",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Rejects or flags clients from networks a threat-intelligence feed scores as malicious.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "feed": {
+            "minItems": 1,
+            "maxItems": 100000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "cidr": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "score": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "lists": {
+                  "default": [],
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              },
+              "required": [
+                "cidr",
+                "score"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Threat-intelligence feed; score 0-100."
+          },
+          "blockScore": {
+            "default": 90,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "suspiciousScore": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "feed"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "not_found_spike",
+      "displayName": "404/403 spike",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags, then rejects, clients whose recent responses are mostly 404/403-style errors (enumeration).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "windowMs": {
+            "default": 60000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "errors": {
+            "default": {
+              "suspicious": 30,
+              "block": 100
+            },
+            "description": "Error responses per client in the window.",
+            "type": "object",
+            "properties": {
+              "suspicious": {
+                "default": 30,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "block": {
+                "default": 100,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              }
+            },
+            "additionalProperties": false
+          },
+          "minErrorRatio": {
+            "default": 0.5,
+            "description": "A busy client with a few broken links is not enumerating.",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "errorStatuses": {
+            "default": [
+              404,
+              403,
+              401,
+              405
+            ],
+            "minItems": 1,
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 599
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "scanner_signature",
+      "displayName": "Scanner signature",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Rejects requests from self-identifying security scanners; flags out-of-band callback domains in payloads.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "sensitive_file_probe",
+      "displayName": "Sensitive file probe",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Rejects requests for files no deployment should serve (.env, .git, backups, admin tooling, debug endpoints).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "tls_fingerprint",
+      "displayName": "TLS fingerprint",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags clients whose TLS (JA3) fingerprint belongs to an HTTP library or another browser than the one claimed.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "browserJa3": {
+            "description": "JA3 hashes per browser family.",
+            "default": {},
+            "type": "object",
+            "properties": {
+              "chrome": {
+                "default": [],
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              },
+              "firefox": {
+                "default": [],
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              },
+              "safari": {
+                "default": [],
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "libraryJa3": {
+            "default": [],
+            "description": "JA3 hashes of HTTP libraries and tools.",
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ja3": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{32}$"
+                },
+                "library": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "ja3",
+                "library"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "trustedProxies": {
+            "default": [],
+            "description": "TLS-terminating proxies whose fingerprint headers are trusted.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 18
+            }
+          },
+          "fingerprintHeaders": {
+            "default": [
+              "x-ja3-fingerprint",
+              "x-ja3-hash",
+              "cf-ja3-hash"
+            ],
+            "description": "Headers those proxies pass the fingerprint in.",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "tor_exit_node",
+      "displayName": "Tor exit node",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags clients connecting from a Tor exit node.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "exitNodes": {
+            "minItems": 1,
+            "maxItems": 100000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f:.]{2,45}$"
+            },
+            "description": "Exit node addresses, normalized (lowercase IPv6, plain IPv4)."
+          }
+        },
+        "required": [
+          "exitNodes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "user_agent_anomaly",
+      "displayName": "User-Agent anomaly",
+      "category": "bot",
+      "contextType": "full",
+      "description": "Flags missing, malformed or outdated User-Agents and client hints that contradict them.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "minMajor": {
+            "description": "Majors older than these are years out of date; real users auto-update, old bot kits don't.",
+            "default": {},
+            "type": "object",
+            "properties": {
+              "chrome": {
+                "default": 110,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "firefox": {
+                "default": 110,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              },
+              "safari": {
+                "default": 14,
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 1000
+              }
+            },
+            "additionalProperties": false
+          },
+          "minLength": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "maxLength": {
+            "default": 512,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "pii_in_request",
+      "displayName": "PII in request",
+      "category": "data_leakage",
+      "contextType": "field",
+      "description": "Rejects checksum-valid card numbers, PESEL, US SSN and IBAN in fields not meant to hold them.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "expectedFields": {
+            "description": "Fields where each identifier is expected, so finding it there is not a leak.",
+            "default": {},
+            "type": "object",
+            "properties": {
+              "payment_card": {
+                "default": [
+                  "cardnumber",
+                  "pan",
+                  "ccnumber",
+                  "creditcard",
+                  "card"
+                ],
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[a-z0-9]+$"
+                }
+              },
+              "pesel": {
+                "default": [
+                  "pesel",
+                  "nationalid"
+                ],
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[a-z0-9]+$"
+                }
+              },
+              "us_ssn": {
+                "default": [
+                  "ssn",
+                  "socialsecuritynumber",
+                  "nationalid"
+                ],
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[a-z0-9]+$"
+                }
+              },
+              "iban": {
+                "default": [
+                  "iban",
+                  "accountnumber",
+                  "bankaccount"
+                ],
+                "maxItems": 1000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[a-z0-9]+$"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "response_leak",
+      "displayName": "Response leak",
+      "category": "data_leakage",
+      "contextType": "full",
+      "description": "On the response pass, rejects stack traces, SQL errors and debug pages; flags internal addresses and paths.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "response_size_anomaly",
+      "displayName": "Response size anomaly",
+      "category": "data_leakage",
+      "contextType": "full",
+      "description": "On the response pass, rejects oversized responses and flags responses far above the route's baseline.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "baselineWindowMs": {
+            "default": 3600000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "minSamples": {
+            "default": 20,
+            "description": "No baseline, no judgement.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxSamples": {
+            "default": 500,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "minFactorOverMedian": {
+            "default": 10,
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "minStdDeviations": {
+            "default": 4,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "minAnomalousBytes": {
+            "default": 262144,
+            "description": "Smaller responses are never worth flagging.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          },
+          "maxResponseBytes": {
+            "default": 52428800,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "secrets_in_payload",
+      "displayName": "Secrets in payload",
+      "category": "data_leakage",
+      "contextType": "field",
+      "description": "Rejects live credentials (private keys, cloud and SaaS tokens) pasted into ordinary fields; flags likely ones.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "credentialFields": {
+            "default": [
+              "password",
+              "passwd",
+              "apikey",
+              "token",
+              "accesstoken",
+              "secret",
+              "clientsecret",
+              "privatekey",
+              "publickey",
+              "credentials"
+            ],
+            "description": "Fields that are supposed to carry a credential (login forms, API key settings).",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "code_injection",
+      "displayName": "Code injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects server-side code execution payloads (eval, constructor chains, process access).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "command_injection",
+      "displayName": "Command injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects shell metacharacters chaining or substituting OS commands.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "control_character",
+      "displayName": "Control character",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects control, bidi and zero-width characters, and line breaks in single-line locations.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "css_injection",
+      "displayName": "CSS injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects CSS that runs script, loads remote resources or exfiltrates through selectors.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "csv_injection",
+      "displayName": "CSV / formula injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects spreadsheet formulas that execute or exfiltrate when an export is opened.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "email_header_injection",
+      "displayName": "Email header injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects line breaks that add mail headers (Bcc, Subject) through form fields.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "expression_language_injection",
+      "displayName": "Expression language injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects Java EL, SpEL and OGNL expressions.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "graphql_injection",
+      "displayName": "GraphQL injection",
+      "category": "injection",
+      "contextType": "full",
+      "description": "Flags alias batching, directive overloading, field duplication, fragment abuse and GraphQL syntax smuggled into variables.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxSameFieldAliases": {
+            "default": 5,
+            "description": "One field requested under more aliases than this: e.g. 100 login mutations in one call.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxDirectivesPerField": {
+            "default": 5,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "maxSameFieldRepeats": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxFragments": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "http_parameter_pollution",
+      "displayName": "HTTP parameter pollution",
+      "category": "injection",
+      "contextType": "full",
+      "description": "Detects parameters repeated with different values, which parsers resolve differently.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "insecure_deserialization",
+      "displayName": "Insecure deserialization",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects serialized Java, .NET, PHP, Python and YAML object payloads.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "jndi_lookup",
+      "displayName": "JNDI lookup (Log4Shell)",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects ${jndi:...} lookups, including nested and obfuscated forms.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ldap_injection",
+      "displayName": "LDAP injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects LDAP filter metacharacters that change a directory query.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "malicious_file_upload",
+      "displayName": "Malicious file upload",
+      "category": "injection",
+      "contextType": "file",
+      "description": "Detects executables, scripts, server pages and server-configuration files uploaded by name or content.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "nosql_injection",
+      "displayName": "NoSQL injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects MongoDB operators, server-side JavaScript and shell methods in values.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "null_byte",
+      "displayName": "Null byte",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects raw and encoded NUL bytes that truncate strings in lower layers.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "path_traversal",
+      "displayName": "Path traversal",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects ../ sequences, including encoded forms, and references to sensitive files.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "polyglot_file",
+      "displayName": "Polyglot file",
+      "category": "injection",
+      "contextType": "file",
+      "description": "Detects uploads that are valid as two formats at once (an image that is also a script or archive).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "prompt_injection",
+      "displayName": "Prompt injection",
+      "category": "injection",
+      "contextType": "full",
+      "description": "Detects instructions aimed at an LLM that override its system prompt or exfiltrate data.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "prototype_pollution",
+      "displayName": "Prototype pollution",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects __proto__, constructor and prototype keys that modify object prototypes.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "regex_injection",
+      "displayName": "Regex injection (ReDoS)",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects user-supplied patterns with catastrophic backtracking.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "shellshock",
+      "displayName": "Shellshock",
+      "category": "injection",
+      "contextType": "full",
+      "description": "Detects bash function definitions in headers (CVE-2014-6271).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "sql_injection",
+      "displayName": "SQL injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects SQL syntax that breaks out of a literal or adds clauses.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ssi_injection",
+      "displayName": "Server-side include injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects <!--#exec --> and other server-side include directives.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ssti",
+      "displayName": "Server-side template injection (SSTI)",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects template expressions for Jinja, Twig, Freemarker, Velocity, Handlebars and others.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "svg_script",
+      "displayName": "Script in SVG",
+      "category": "injection",
+      "contextType": "file",
+      "description": "Detects script, event handlers, external references and embedded documents in uploaded SVG images.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "webshell_signature",
+      "displayName": "Webshell signature",
+      "category": "injection",
+      "contextType": "full",
+      "description": "Detects known webshell code and command-and-control parameters in bodies and uploads.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "xpath_injection",
+      "displayName": "XPath injection",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects XPath syntax that breaks out of a predicate.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "xss",
+      "displayName": "Cross-site scripting (XSS)",
+      "category": "injection",
+      "contextType": "field",
+      "description": "Detects script tags, event handlers and javascript: URLs, including encoded forms.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "xxe",
+      "displayName": "XML external entity (XXE)",
+      "category": "injection",
+      "contextType": "full",
+      "description": "Detects DOCTYPE declarations with external entities or parameter entities in XML bodies.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "zip_slip",
+      "displayName": "Zip slip",
+      "category": "injection",
+      "contextType": "file",
+      "description": "Detects archive entries whose paths escape the extraction directory.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "absolute_uri_request",
+      "displayName": "Absolute URI in request line",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Rejects authority-form, asterisk-form and foreign absolute-form request targets; flags absolute-form to the own host.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedHosts": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9.-]+$"
+            },
+            "description": "Hostnames the application is served under, lowercase, without port."
+          }
+        },
+        "required": [
+          "allowedHosts"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "chunked_encoding_anomaly",
+      "displayName": "Chunked encoding anomaly",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Rejects malformed or oversized chunk sizes, chunk extensions and forbidden trailer fields.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxChunkSizeDigits": {
+            "default": 16,
+            "description": "Longer size fields are valid hex but parse differently across stacks.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "maxExtensionBytes": {
+            "default": 1024,
+            "description": "Chunk extensions are a known DoS vector (unbounded buffering).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "maxChunks": {
+            "default": 10000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "duplicate_headers",
+      "displayName": "Duplicate headers",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Detects repeated headers that must appear only once, which hops resolve differently.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "hop_by_hop_abuse",
+      "displayName": "Hop-by-hop header abuse",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Detects Connection headers that name end-to-end or security headers so a hop strips them.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "host_header_injection",
+      "displayName": "Host header injection",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Rejects missing, malformed or foreign Host headers and foreign alternate host headers; flags mismatches.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedHosts": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9.-]+$"
+            },
+            "description": "Hostnames the application is served under, lowercase, without port."
+          },
+          "alternateHostHeaders": {
+            "default": [
+              "x-forwarded-host",
+              "x-host",
+              "x-forwarded-server",
+              "x-original-host",
+              "x-http-host-override"
+            ],
+            "description": "Headers that override or accompany Host in some frameworks (password-reset links, absolute redirects).",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          }
+        },
+        "required": [
+          "allowedHosts"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "invalid_header_chars",
+      "displayName": "Invalid header characters",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Detects header names and values containing characters HTTP does not allow.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "request_smuggling",
+      "displayName": "Request smuggling",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Detects conflicting or obfuscated Content-Length and Transfer-Encoding framing.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "websocket_origin",
+      "displayName": "WebSocket origin",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Rejects WebSocket upgrades from foreign origins (cross-site WebSocket hijacking); flags missing origins.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedOrigins": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 2048
+            }
+          }
+        },
+        "required": [
+          "allowedOrigins"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "x_forwarded_for_spoofing",
+      "displayName": "X-Forwarded-For spoofing",
+      "category": "protocol",
+      "contextType": "full",
+      "description": "Flags client-IP headers set by anyone but a trusted proxy, malformed or overlong chains and claimed internal addresses.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "trustedProxies": {
+            "default": [],
+            "description": "Proxies allowed to set X-Forwarded-For and client-IP headers.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 18
+            }
+          },
+          "maxChain": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "clientIpHeaders": {
+            "default": [
+              "x-real-ip",
+              "true-client-ip",
+              "x-client-ip",
+              "cf-connecting-ip",
+              "x-cluster-client-ip",
+              "fastly-client-ip",
+              "x-originating-ip"
+            ],
+            "description": "Headers applications read as \"the real client IP\".",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9!#$%&'*+.^_`|~-]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "archive_expansion_ratio",
+      "displayName": "Archive expansion ratio",
+      "category": "resource",
+      "contextType": "file",
+      "description": "Rejects archive uploads that expand too much (zip bombs), too far in total, or hold too many entries.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxRatio": {
+            "default": 100,
+            "description": "Uncompressed bytes per compressed byte.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "minBytesForRatio": {
+            "default": 1048576,
+            "description": "Below this uncompressed size the ratio is ignored: tiny archives compress \"badly\" harmlessly.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          },
+          "maxUncompressedBytes": {
+            "default": 1073741824,
+            "description": "Absolute cap regardless of ratio.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1099511627776
+          },
+          "maxEntries": {
+            "default": 10000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "array_length",
+      "displayName": "Array length",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects bodies with an oversized array or too many array elements in total.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxArrayLength": {
+            "default": 1000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "maxTotalElements": {
+            "default": 10000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "compressed_body_ratio",
+      "displayName": "Compressed body ratio",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects compressed request bodies that decompress too far (gzip bombs), stacked or unknown encodings.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxRatio": {
+            "default": 100,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "minBytesForRatio": {
+            "default": 1048576,
+            "description": "Small bodies compress \"too well\" harmlessly.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          },
+          "maxDecompressedBytes": {
+            "default": 10485760,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          },
+          "maxEncodings": {
+            "default": 2,
+            "description": "\"gzip, gzip, gzip, br\" stacks bombs inside bombs.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "concurrent_connections",
+      "displayName": "Concurrent connections",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects clients with too many requests in flight at once.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxInFlight": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "assumedLatencyMs": {
+            "default": 1000,
+            "description": "Tools only see a request start, so a request is assumed to be in flight this long.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cookie_size",
+      "displayName": "Cookie count and size",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects more cookies, larger cookies or larger Cookie headers than browsers send.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxCookies": {
+            "default": 50,
+            "description": "RFC 6265 asks browsers to support at least 50 cookies of 4096 bytes per domain.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxCookieBytes": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "maxTotalBytes": {
+            "default": 8192,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "endpoint_quota",
+      "displayName": "Endpoint cost quota",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects clients that spend more than their cost budget on expensive routes within a window.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "costs": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "route": {
+                  "type": "string",
+                  "maxLength": 1024,
+                  "pattern": "^\\/[^?#\\s]*$"
+                },
+                "cost": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000
+                }
+              },
+              "required": [
+                "route",
+                "cost"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Relative cost of a request per route; the most specific route wins and unlisted routes are free."
+          },
+          "costPerWindow": {
+            "default": 200,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "windowMs": {
+            "default": 60000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          }
+        },
+        "required": [
+          "costs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "expensive_query",
+      "displayName": "Expensive query",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects wildcard-only searches; flags leading or repeated wildcards and sorts without a limit.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "searchFields": {
+            "default": [
+              "q",
+              "query",
+              "search",
+              "term",
+              "keyword",
+              "keywords",
+              "filter",
+              "name",
+              "title",
+              "text"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "sortFields": {
+            "default": [
+              "sort",
+              "sortby",
+              "orderby",
+              "order"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "limitFields": {
+            "default": [
+              "limit",
+              "pagesize",
+              "perpage",
+              "size",
+              "take",
+              "first",
+              "top"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "minSearchLength": {
+            "default": 2,
+            "description": "Wildcard searches need at least this many real characters.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "file_size",
+      "displayName": "File size",
+      "category": "resource",
+      "contextType": "file",
+      "description": "Rejects uploaded files larger than a limit.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxBytes": {
+            "default": 5242880,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "graphql_complexity",
+      "displayName": "GraphQL complexity",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects GraphQL requests that are too deep, costly, wide, long or batched.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxDepth": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "maxCost": {
+            "default": 1000,
+            "description": "Fields weighted by the page sizes of their ancestors.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000000
+          },
+          "maxAliases": {
+            "default": 30,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxFields": {
+            "default": 500,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxBatch": {
+            "default": 5,
+            "description": "Operations in one HTTP request (array body).",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "maxQueryBytes": {
+            "default": 20000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "graphql_introspection",
+      "displayName": "GraphQL introspection",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects GraphQL introspection (__schema, __type) where it is not allowed.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowIntrospection": {
+            "default": false,
+            "description": "Allow introspection, e.g. on a development deployment.",
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "header_count",
+      "displayName": "Header count and size",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects requests with too many headers, too many header bytes, or one oversized header.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxHeaders": {
+            "default": 100,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxTotalBytes": {
+            "default": 16384,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          },
+          "maxHeaderBytes": {
+            "default": 8192,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10485760
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "image_dimensions",
+      "displayName": "Image dimensions",
+      "category": "resource",
+      "contextType": "file",
+      "description": "Rejects uploaded images too large to decode safely, and pixel floods (huge, nearly empty images).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxSide": {
+            "default": 16384,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "maxPixels": {
+            "default": 50000000,
+            "description": "About 200 MB of RGBA once decoded.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000000
+          },
+          "maxPixelsPerByte": {
+            "default": 2000,
+            "description": "Real photos compress far less than this; pixel floods are mostly empty.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "json_depth",
+      "displayName": "JSON nesting depth",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects JSON bodies nested deeper than a limit.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxDepth": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "multipart_part_count",
+      "displayName": "Multipart part count",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects multipart bodies with too many parts or files, or a missing, invalid or duplicated boundary.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxParts": {
+            "default": 100,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxFiles": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "maxBoundaryLength": {
+            "default": 70,
+            "description": "RFC 2046 allows 70.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 70
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "object_key_count",
+      "displayName": "Object key count",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects bodies with too many keys in one object or in total (hash-table pressure).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxKeysPerObject": {
+            "default": 200,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "maxTotalKeys": {
+            "default": 5000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "pagination_abuse",
+      "displayName": "Pagination abuse",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects page sizes, offsets and page numbers beyond limits, and non-plain values that dodge them.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxPageSize": {
+            "default": 100,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "maxOffset": {
+            "default": 10000,
+            "description": "Deep OFFSET scans every skipped row.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "maxPage": {
+            "default": 1000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000
+          },
+          "pageSizeFields": {
+            "default": [
+              "limit",
+              "pagesize",
+              "perpage",
+              "size",
+              "take",
+              "first",
+              "last",
+              "count",
+              "maxresults",
+              "top",
+              "rows",
+              "pagelimit"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "offsetFields": {
+            "default": [
+              "offset",
+              "skip",
+              "start",
+              "from"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          },
+          "pageFields": {
+            "default": [
+              "page",
+              "pagenumber",
+              "pageindex",
+              "p"
+            ],
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "query_param_count",
+      "displayName": "Query and form parameter count",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects requests with too many query or form parameters.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxQueryParams": {
+            "default": 100,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxFormParams": {
+            "default": 500,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "range_header_abuse",
+      "displayName": "Range header abuse",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects Range headers with too many or overlapping ranges; flags malformed ones.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxRanges": {
+            "default": 10,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "maxHeaderLength": {
+            "default": 1024,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "rate_limit",
+      "displayName": "Rate limit",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects more requests per client and endpoint than allowed in a sliding window.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "limit": {
+            "default": 100,
+            "description": "Requests allowed per window.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "windowMs": {
+            "default": 60000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "request_size",
+      "displayName": "Request size",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects requests whose query, headers, body and files exceed a size limit.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxBytes": {
+            "default": 1048576,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1073741824
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "scraping_pattern",
+      "displayName": "Scraping pattern",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Flags clients covering much of a catalog or walking its pages in order.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Catalog routes. Omitted, every endpoint the step is attached to.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 600000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "maxDistinctResources": {
+            "default": 150,
+            "description": "Product or listing pages a person won't open in one window.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "minSequentialPages": {
+            "default": 20,
+            "description": "page=1,2,3,... walked in order.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "slow_request",
+      "displayName": "Slow request",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects requests whose headers or body arrive too slowly (slowloris, slow POST).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxHeadersMs": {
+            "default": 10000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000
+          },
+          "maxBodyMs": {
+            "default": 30000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 3600000
+          },
+          "minBodyBytesPerSecond": {
+            "default": 500,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000000
+          },
+          "minBodyMsForRate": {
+            "default": 5000,
+            "description": "Shorter bodies have too little data for a meaningful rate.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 600000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "sms_email_pumping",
+      "displayName": "SMS / email pumping",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects clients sending codes to many destinations or flooding one; flags tenant-wide bursts and high-cost prefixes.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "routes": {
+            "description": "Routes that send an SMS or email. Omitted, every endpoint the step is attached to.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          },
+          "windowMs": {
+            "default": 600000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 86400000
+          },
+          "clientDestinations": {
+            "default": {
+              "suspicious": 5,
+              "block": 20
+            },
+            "description": "Distinct destinations one client sends to in the window.",
+            "type": "object",
+            "properties": {
+              "suspicious": {
+                "default": 5,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              },
+              "block": {
+                "default": 20,
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100000
+              }
+            },
+            "additionalProperties": false
+          },
+          "tenantSuspiciousDestinations": {
+            "default": 500,
+            "description": "Distinct destinations all clients together send to: a distributed pumping campaign.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          },
+          "destinationMaxSends": {
+            "default": 5,
+            "description": "Messages one destination receives: one number or address bombed with codes.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "highRiskPrefixes": {
+            "default": [
+              "+881",
+              "+882",
+              "+883",
+              "+979",
+              "+870",
+              "+247",
+              "+290",
+              "+675",
+              "+677",
+              "+678",
+              "+252",
+              "+239"
+            ],
+            "description": "International prefixes with high termination fees, the ones toll-fraud rings own numbers in.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\+\\d{1,6}$"
+            }
+          },
+          "destinationFields": {
+            "default": [
+              "phone",
+              "phonenumber",
+              "msisdn",
+              "mobile",
+              "to",
+              "recipient",
+              "email",
+              "emailaddress",
+              "destination"
+            ],
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "websocket_abuse",
+      "displayName": "WebSocket abuse",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects oversized or heavily fragmented WebSocket messages and message floods per connection.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxMessageBytes": {
+            "default": 65536,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 104857600
+          },
+          "maxFramesPerMessage": {
+            "default": 100,
+            "description": "Heavy fragmentation is a parser DoS.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "maxMessagesPerSecond": {
+            "default": 50,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "maxMessagesPerMinute": {
+            "default": 1000,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "xml_bomb",
+      "displayName": "XML bomb",
+      "category": "resource",
+      "contextType": "full",
+      "description": "Rejects XML with recursive, deeply nested or hugely expanding internal entities (billion laughs).",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxEntities": {
+            "default": 20,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "maxExpandedBytes": {
+            "default": 1048576,
+            "description": "What the entities would expand to, estimated without expanding them.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1073741824
+          },
+          "maxNesting": {
+            "default": 3,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cache_poisoning",
+      "displayName": "Cache poisoning",
+      "category": "url",
+      "contextType": "full",
+      "description": "Flags unkeyed forwarding and path-override headers from clients, and GET requests with a body.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "trustedProxies": {
+            "default": [],
+            "description": "Proxies that legitimately add forwarding headers.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 18
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "cloud_metadata",
+      "displayName": "Cloud metadata endpoint",
+      "category": "url",
+      "contextType": "field",
+      "description": "Detects URLs pointing at cloud instance metadata services, in any address notation.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "dns_rebinding",
+      "displayName": "DNS rebinding",
+      "category": "url",
+      "contextType": "field",
+      "description": "Flags hosts of rebinding services and hosts known to resolve to private addresses.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "knownAnswers": {
+            "default": [],
+            "description": "Known DNS answers. Tools run synchronously and cannot resolve names, so only hosts listed here are judged by their addresses.",
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 253,
+                  "pattern": "^[a-z0-9.-]+$"
+                },
+                "addresses": {
+                  "minItems": 1,
+                  "maxItems": 50,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$"
+                  }
+                }
+              },
+              "required": [
+                "host",
+                "addresses"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "idn_homograph",
+      "displayName": "IDN homograph",
+      "category": "url",
+      "contextType": "field",
+      "description": "Flags hosts mixing scripts or built from look-alike characters, especially ones imitating protected domains.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "protectedDomains": {
+            "default": [],
+            "description": "Own domains and brands whose look-alikes are reported.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9.-]+$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ip_obfuscation",
+      "displayName": "IP address obfuscation",
+      "category": "url",
+      "contextType": "field",
+      "description": "Detects IP addresses written in decimal, octal, hex or other notations that evade allowlists.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "open_redirect",
+      "displayName": "Open redirect",
+      "category": "url",
+      "contextType": "field",
+      "description": "Flags redirect parameters pointing to foreign hosts, dangerous schemes or URLs with embedded credentials.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "allowedHosts": {
+            "minItems": 1,
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 253,
+              "pattern": "^[a-z0-9.-]+$"
+            },
+            "description": "Hosts a redirect may point to; subdomains are allowed too (\"app.example.com\" matches \"example.com\")."
+          },
+          "redirectFields": {
+            "default": [
+              "redirect",
+              "redirecturi",
+              "redirecturl",
+              "redirectto",
+              "return",
+              "returnto",
+              "returnurl",
+              "returnuri",
+              "returnpath",
+              "next",
+              "nexturl",
+              "continue",
+              "dest",
+              "destination",
+              "goto",
+              "forward",
+              "target",
+              "callback",
+              "callbackurl",
+              "successurl",
+              "failureurl",
+              "cancelurl",
+              "back",
+              "backurl",
+              "rurl",
+              "postlogin",
+              "postlogout"
+            ],
+            "description": "Fields holding a redirect target. A generic \"url\" is left out: most URL fields are not redirects.",
+            "maxItems": 1000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-z0-9]+$"
+            }
+          }
+        },
+        "required": [
+          "allowedHosts"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "path_normalization",
+      "displayName": "Path normalization",
+      "category": "url",
+      "contextType": "full",
+      "description": "Flags paths that normalize differently across stacks; rejects ones that resolve to a privileged route.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "privilegedRoutes": {
+            "default": [],
+            "description": "Routes an access-control layer protects, so a disguised path reaching them is a bypass attempt.",
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 1024,
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "ssrf",
+      "displayName": "Server-side request forgery (SSRF)",
+      "category": "url",
+      "contextType": "field",
+      "description": "Detects URLs to internal addresses, internal names, wildcard DNS services and dangerous schemes.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "url_length",
+      "displayName": "URL length",
+      "category": "url",
+      "contextType": "full",
+      "description": "Rejects URLs whose path, path segment, query or total length exceeds a limit.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxPathLength": {
+            "default": 2048,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "maxSegmentLength": {
+            "default": 255,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "maxQueryLength": {
+            "default": 4096,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "maxUrlLength": {
+            "default": 8192,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "url_parser_differential",
+      "displayName": "URL parser differential",
+      "category": "url",
+      "contextType": "field",
+      "description": "Detects URLs that different parsers resolve to different hosts.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "url_validator",
+      "displayName": "URL validator",
+      "category": "url",
+      "contextType": "field",
+      "description": "Rejects URL fields that are malformed, too long, use a disallowed scheme or embed credentials.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "maxLength": {
+            "default": 2048,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "allowedSchemes": {
+            "default": [
+              "http",
+              "https"
+            ],
+            "description": "Lowercase schemes without \":\".",
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9+.-]*$"
+            }
+          },
+          "urlTypes": {
+            "default": [
+              "url",
+              "uri"
+            ],
+            "description": "Declared field types the tool validates; empty validates every string field the step targets.",
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "web_cache_deception",
+      "displayName": "Web cache deception",
+      "category": "url",
+      "contextType": "full",
+      "description": "Flags requests for personal pages disguised with a static file extension a CDN would cache.",
+      "config": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "staticPrefixes": {
+            "default": [
+              "/static/",
+              "/assets/",
+              "/public/",
+              "/_next/static/",
+              "/build/",
+              "/dist/",
+              "/images/",
+              "/img/",
+              "/css/",
+              "/js/",
+              "/fonts/"
+            ],
+            "description": "Lowercase path prefixes where real static files live; a static extension anywhere else is a disguise.",
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\/[^?#\\s]*$"
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  ]
+}

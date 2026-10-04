@@ -38,9 +38,10 @@ async function main(): Promise<void> {
     cacheFile: config.dashboard.cacheFile,
   }, verifier);
   const bundle = await bundles.start();
-  const snapshot = new PolicySnapshot(bundle);
   const redis = new RedisStorage({ url: config.redisUrl });
   await connectOptional(() => redis.connect());
+  // tools that look across requests keep their state in Redis; while it is down they report ERROR
+  const snapshot = new PolicySnapshot(bundle, (tenantId) => redis.tenant(tenantId));
   const tenantRedis = redis.tenant(config.tenantId).sub(bundle.version);
   const credential = new CredentialManager(
     config.dashboard.url,

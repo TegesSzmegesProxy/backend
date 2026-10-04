@@ -1,5 +1,5 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
-import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
+import { SlidingWindow, Tool, ToolCategory, ToolContextType, ToolResult, ToolState } from '@tessera/core/static-analysis/shared';
 
 interface Sighting {
     at: number;
@@ -8,27 +8,24 @@ interface Sighting {
 }
 
 export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
-    // hard-coded until we have enough infrastructure to support tool configuration
-    private static readonly WINDOW_MS = 60_000;
-    private static readonly MAX_DISTINCT_ENDPOINTS = 15; // scanning: many different endpoints in one window
-    private static readonly MIN_SEQUENCE = 5; // enumeration: this many consecutive integer values on one endpoint
     private static readonly MAX_HISTORY = 200; // per client
-    private static readonly MAX_CLIENTS = 50_000;
 
-    // client key -> recent requests, oldest first. Per instance: the plan must reuse one instance across requests.
-    private readonly history = new Map<string, Sighting[]>();
+    // (Redis, per tenant) client -> recent requests, oldest first.
+    private readonly history: SlidingWindow<Omit<Sighting, 'at'>>;
 
-    constructor() {
+    constructor(private readonly config: ToolConfig<'sequence_analysis'>, state: ToolState) {
         super({
             id: 'sequence_analysis',
             displayName: 'Sequence analysis',
             category: ToolCategory.Anomaly,
             contextType: ToolContextType.Full,
         });
+        this.history = state.window('history', config.windowMs, SequenceAnalysis.MAX_HISTORY);
     }
 
-    override run(context: NormalizedRequest): ToolResult {
-        const { WINDOW_MS, MAX_DISTINCT_ENDPOINTS, MIN_SEQUENCE } = SequenceAnalysis;
+    override async run(context: NormalizedRequest): Promise<ToolResult> {
+        // scanning: many different endpoints in one window; enumeration: consecutive integer values on one endpoint
+        const { windowMs, maxDistinctEndpoints, minSequence } = this.config;
 
         if (!context.clientIp || !context.tenantId) {
             return {
@@ -40,30 +37,18 @@ export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
         }
 
         const now = Date.now();
-        const key = `${context.tenantId}|${context.clientIp}`;
-        const recent = (this.history.get(key) ?? []).filter(s => now - s.at <= WINDOW_MS);
-
         // ponytail: assumes the pipeline runs each tool once per request; a retry would count twice.
-        recent.push({ at: now, endpoint: context.endpoint, ids: SequenceAnalysis.integerValues(context) });
-        if (recent.length > SequenceAnalysis.MAX_HISTORY) {
-            recent.shift();
-        }
-
-        // delete + set moves the client to the end of the Map, so eviction drops the least recently active one
-        this.history.delete(key);
-        this.history.set(key, recent);
-        while (this.history.size > SequenceAnalysis.MAX_CLIENTS) {
-            const oldest = this.history.keys().next();
-            if (oldest.done) break;
-            this.history.delete(oldest.value);
-        }
+        const recent: Sighting[] = (await this.history.record(context.tenantId, context.clientIp, {
+            endpoint: context.endpoint,
+            ids: SequenceAnalysis.integerValues(context),
+        }, now)).map(event => ({ at: event.at, ...event.value }));
 
         const distinct = new Set(recent.map(s => s.endpoint)).size;
         const run = SequenceAnalysis.longestRun(recent.filter(s => s.endpoint === context.endpoint));
 
         const findings: string[] = [];
-        if (distinct > MAX_DISTINCT_ENDPOINTS) findings.push('endpoint_scan');
-        if (run >= MIN_SEQUENCE) findings.push('sequential_id_enumeration');
+        if (distinct > maxDistinctEndpoints) findings.push('endpoint_scan');
+        if (run >= minSequence) findings.push('sequential_id_enumeration');
 
         if (findings.length === 0) {
             return { tool: this.tool, status: 'SUCCESS', verdict: 'SAFE', evidence: undefined };
@@ -73,7 +58,7 @@ export default class SequenceAnalysis extends Tool<ToolContextType.Full> {
             tool: this.tool,
             status: 'SUCCESS',
             verdict: 'SUSPICIOUS',
-            evidence: { findings, distinctEndpoints: distinct, longestSequence: run, windowMs: WINDOW_MS },
+            evidence: { findings, distinctEndpoints: distinct, longestSequence: run, windowMs },
         };
     }
 

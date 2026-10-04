@@ -16,6 +16,7 @@ import { DecisionOrchestrator } from '../../source/core/decisionOrchestrator';
 import { AdaptiveControl } from '../../source/feedback';
 import { Sampler } from '../../source/core/sampling';
 import { ProxyReporter } from '../../source/shared/telemetry/ProxyReporter';
+import { MemoryToolState } from '../support/memoryToolState';
 
 const TENANT = '3f2b8c1e4a5d4e6f8a7b9c0d';
 const { privateKey, publicKey } = generateKeyPairSync('ed25519');
@@ -49,6 +50,7 @@ function bundle(overrides: Record<string, unknown> = {}): SignedBundle {
   return { ...payload, signature: { algorithm: 'Ed25519', keyId, value: sign(null, Buffer.from(canonicalJson(payload)), privateKey).toString('base64url') } } as SignedBundle;
 }
 
+const state = new MemoryToolState();
 const originalFetch = globalThis.fetch;
 afterEach(() => { globalThis.fetch = originalFetch; vi.restoreAllMocks(); });
 
@@ -70,6 +72,38 @@ describe('bundle distribution', () => {
       decision: { ...valid.runtimeConfig.decision, sampling: { minN: 0, maxN: 1 } },
     } });
     expect(() => verifier.verify(invalidSampling)).toThrow();
+  });
+
+  it('validates every step against its tool contract and keeps accepting v1 bundles', () => {
+    const verifier = new BundleVerifier(publicPem, TENANT);
+    const withSteps = (steps: unknown[], toolRegistryVersion = 'tessera.tools/v2') => bundle({ policy: {
+      schemaVersion: 'tessera.policy/v1', toolRegistryVersion, endpoints: [{ method: 'POST', path: '/login', steps }],
+    } });
+    const valid = [
+      { toolId: 'brute_force', contextType: 'full', config: { attempts: { suspicious: 2, block: 3 } } },
+      { toolId: 'rate_limit', contextType: 'full', config: {} },
+      { toolId: 'enum_validation', contextType: 'field', target: 'body.currency', config: { values: ['PLN', 'EUR'] } },
+      { toolId: 'file_size', contextType: 'file', target: 'avatar', config: { maxBytes: 1024 } },
+    ];
+    const verified = verifier.verify(withSteps(valid));
+    // the signed config is kept as sent; defaults are applied when the tool is built
+    expect(verified.policy.endpoints[0].steps[1].config).toEqual({});
+    const plan = new PolicySnapshot(verified, state.stores).match('POST', '/api/login')!.plan;
+    expect(plan.map((step) => step.tool.tool)).toEqual(['brute_force', 'rate_limit', 'enum_validation', 'file_size']);
+
+    const rejects = (step: Record<string, unknown>) => expect(() => verifier.verify(withSteps([step]))).toThrow();
+    rejects({ toolId: 'sql_injection', contextType: 'full', config: {} }); // a field tool run as a whole-request tool
+    rejects({ toolId: 'sql_injection', contextType: 'field', config: {} }); // no target
+    rejects({ toolId: 'rate_limit', contextType: 'full', target: 'body.x', config: {} });
+    rejects({ toolId: 'rate_limit', contextType: 'full', config: { limit: -1 } });
+    rejects({ toolId: 'rate_limit', contextType: 'full', config: { limit: 5, unknownSetting: true } });
+    rejects({ toolId: 'honeypot_field', contextType: 'full', config: {} }); // required setting missing
+    rejects({ toolId: 'cookie_tampering', contextType: 'full', config: { secret: 'short', signedCookies: ['session'] } });
+
+    const v1Step = { toolId: 'string_length', contextType: 'field', target: 'body.name', config: { maxLength: 5 } };
+    expect(verifier.verify(withSteps([v1Step], 'tessera.tools/v1')).policy.toolRegistryVersion).toBe('tessera.tools/v1');
+    expect(() => verifier.verify(withSteps([valid[1]], 'tessera.tools/v1'))).toThrow();
+    expect(() => verifier.verify(withSteps([valid[1]], 'tessera.tools/v3'))).toThrow();
   });
 
   it('uses the last verified disk copy during an outage and never switches a running snapshot', async () => {
@@ -109,8 +143,8 @@ describe('bundle distribution', () => {
     } finally { await rm(dir, { recursive: true, force: true }); }
   });
 
-  it('matches policy paths and enforces configured string lengths on body targets', () => {
-    const snapshot = new PolicySnapshot(bundle());
+  it('matches policy paths and enforces configured string lengths on body targets', async () => {
+    const snapshot = new PolicySnapshot(bundle(), state.stores);
     const route = snapshot.match('POST', '/api/users/42');
     expect(route?.key).toBe('POST /users/:id');
     expect(route?.upstreamPath).toBe('/users/42');
@@ -119,15 +153,15 @@ describe('bundle distribution', () => {
     if (!('target' in step)) throw new Error('expected field tool');
     expect(step.target).toBe('body.username');
     const tool = step.tool as Tool<ToolContextType.Field>;
-    expect(tool.run({ name: 'username', location: 'body', value: 'ab', type: 'string' }).verdict).toBe('POLICY_VIOLATION');
-    expect(tool.run({ name: 'username', location: 'body', value: 'alice', type: 'string' }).verdict).toBe('SAFE');
-    expect(tool.run({ name: 'username', location: 'body', value: 'longusername', type: 'string' }).verdict).toBe('POLICY_VIOLATION');
+    expect((await tool.run({ name: 'username', location: 'body', value: 'ab', type: 'string' })).verdict).toBe('POLICY_VIOLATION');
+    expect((await tool.run({ name: 'username', location: 'body', value: 'alice', type: 'string' })).verdict).toBe('SAFE');
+    expect((await tool.run({ name: 'username', location: 'body', value: 'longusername', type: 'string' })).verdict).toBe('POLICY_VIOLATION');
     const base = bundle();
     const withExact = bundle({ policy: { ...base.policy, endpoints: [
       ...base.policy.endpoints,
       { ...base.policy.endpoints[0], path: '/users/new' },
     ] } });
-    const exactSnapshot = new PolicySnapshot(new BundleVerifier(publicPem, TENANT).verify(withExact));
+    const exactSnapshot = new PolicySnapshot(new BundleVerifier(publicPem, TENANT).verify(withExact), state.stores);
     expect(exactSnapshot.match('POST', '/api/users/new')?.key).toBe('POST /users/new');
     expect(exactSnapshot.match('POST', '/api/users/42/')?.key).toBeUndefined();
   });
@@ -144,7 +178,7 @@ describe('bundle distribution', () => {
       samplingRate: 0,
       decision: { ...base.runtimeConfig.decision, sampling: { minN: 0, maxN: 0 } },
     } });
-    const snapshot = new PolicySnapshot(new BundleVerifier(publicPem, TENANT).verify(signed));
+    const snapshot = new PolicySnapshot(new BundleVerifier(publicPem, TENANT).verify(signed), state.stores);
     const manager = new BundleManager({ tenantId: TENANT, apiBaseUrl: 'http://dashboard.local/', deploymentKey: 'secret', cacheFile: '/unused' }, new BundleVerifier(publicPem, TENANT));
     const reporter = new ProxyReporter({ tenantId: TENANT, apiBaseUrl: 'http://dashboard.local/', deploymentKey: 'secret', proxyVersion: 'test' }, manager);
     const orchestrator = new DecisionOrchestrator({
@@ -163,7 +197,7 @@ describe('bundle distribution', () => {
       expect((await post('/api/users/42', 'ab')).status).toBe(403);
       expect((await post('/api/other', 'alice')).status).toBe(403);
       const allowUnknown = bundle({ runtimeConfig: { ...signed.runtimeConfig, unknownEndpointBehavior: 'allow' } });
-      const allowedSnapshot = new PolicySnapshot(new BundleVerifier(publicPem, TENANT).verify(allowUnknown));
+      const allowedSnapshot = new PolicySnapshot(new BundleVerifier(publicPem, TENANT).verify(allowUnknown), state.stores);
       const otherIngress = new IngressServer({ normalizer: new Normalizer(), runner: new Runner(), aggregator: new Aggregator(), orchestrator, snapshot: allowedSnapshot, reporter }, { tenantId: TENANT, port: 0, host: '127.0.0.1' });
       try {
         const otherAddress = await otherIngress.start();

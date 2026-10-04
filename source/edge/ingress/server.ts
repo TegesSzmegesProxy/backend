@@ -65,7 +65,7 @@ class IngressServer {
             return reply.from(`${snapshot.routePath(rawPath) ?? rawPath}${query}`, { timeout: snapshot.bundle.runtimeConfig.thresholds.requestTimeoutMs });
           }
           normalized.endpoint = route.key;
-          const staticResult = aggregator.aggregate(runner.run(normalized, route.plan));
+          const staticResult = aggregator.aggregate(await runner.run(normalized, route.plan));
           console.log(`Static analysis result for ${normalized.requestId} (endpoint ${normalized.endpoint}):`, staticResult);
           const decision = await orchestrator.orchestrate(normalized, staticResult);
           reporter.record(route.key, decision);

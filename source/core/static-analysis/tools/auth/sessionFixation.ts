@@ -1,4 +1,4 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
 
 interface Finding {
@@ -6,13 +6,6 @@ interface Finding {
     source: 'path' | 'query' | 'body' | 'cookie';
     name?: string;
 }
-
-// Names under which session IDs travel, compared after lowercasing and removing "_", "-", "." and spaces.
-// ASP.NET also appends a random suffix ("ASPSESSIONIDQQQABCDE"), so that one is matched by prefix.
-const SESSION_NAMES = new Set([
-    'sessionid', 'sessid', 'sid', 'session', 'sessionkey', 'sessiontoken', 'phpsessid', 'jsessionid',
-    'aspnetsessionid', 'connectsid', 'laravelsession', 'cfid', 'cftoken',
-]);
 
 // Locations that are not an attacker-reachable delivery channel for a session ID, or are handled separately.
 // Adjust to the values RequestField.location actually takes.
@@ -27,21 +20,22 @@ const COOKIE_INJECTION = /set-cookie\s*:|http-equiv\s*=\s*["']?\s*set-cookie|doc
 // Characters allowed in a session cookie value (base64, base64url, hex, UUID, and percent-encoding).
 const VALID_SESSION_CHARS = /^[A-Za-z0-9._~+/=:%-]+$/;
 
-// hard-coded until we have enough infrastructure to support tool configuration
-const MIN_SESSION_ID_LENGTH = 16;
-const MIN_DISTINCT_CHARS = 6;
-const MAX_SESSION_ID_LENGTH = 512;
 const MAX_ENTRIES = 500;
 const MAX_DECODE_ROUNDS = 2;
 
 export default class SessionFixation extends Tool<ToolContextType.Full> {
-    constructor() {
+    // Names under which session IDs travel, compared after lowercasing and removing "_", "-", "." and spaces.
+    // ASP.NET also appends a random suffix ("ASPSESSIONIDQQQABCDE"), so that one is matched by prefix.
+    private readonly sessionNames: ReadonlySet<string>;
+
+    constructor(private readonly config: ToolConfig<'session_fixation'>) {
         super({
             id: 'session_fixation',
             displayName: 'Session fixation',
             category: ToolCategory.Auth,
             contextType: ToolContextType.Full,
         });
+        this.sessionNames = new Set(config.sessionNames);
     }
 
     override run(context: NormalizedRequest): ToolResult {
@@ -63,7 +57,7 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
 
         // 2. session ID or cookie-planting payload carried in the query string
         for (const [name, value] of Object.entries(context.query ?? {}).slice(0, MAX_ENTRIES)) {
-            if (SessionFixation.isSessionName(name)) {
+            if (this.isSessionName(name)) {
                 add('session_id_in_query', 'query', name);
             }
             if (SessionFixation.plantsCookie(value)) {
@@ -76,7 +70,7 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
             if (SKIPPED_FIELD_LOCATIONS.has(String(field.location).toLowerCase())) {
                 continue;
             }
-            if (typeof field.name === 'string' && SessionFixation.isSessionName(field.name)) {
+            if (typeof field.name === 'string' && this.isSessionName(field.name)) {
                 add('session_id_in_body', 'body', field.name);
             }
             if (typeof field.value === 'string' && SessionFixation.plantsCookie(field.value)) {
@@ -87,7 +81,7 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
         // 4. the Cookie header: repeated session cookies and session IDs that don't look server-issued
         const cookieHeader = Object.entries(context.headers ?? {}).find(([name]) => name.toLowerCase() === 'cookie')?.[1];
         if (typeof cookieHeader === 'string') {
-            SessionFixation.inspectCookies(cookieHeader, add);
+            this.inspectCookies(cookieHeader, add);
         }
 
         if (findings.length > 0) {
@@ -108,7 +102,7 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
         };
     }
 
-    private static inspectCookies(header: string, add: (rule: string, source: Finding['source'], name?: string) => void): void {
+    private inspectCookies(header: string, add: (rule: string, source: Finding['source'], name?: string) => void): void {
         const counts = new Map<string, number>();
 
         for (const part of header.split(';').slice(0, MAX_ENTRIES)) {
@@ -118,7 +112,7 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
             }
 
             const name = part.slice(0, separator).trim();
-            if (!SessionFixation.isSessionName(name)) {
+            if (!this.isSessionName(name)) {
                 continue;
             }
 
@@ -129,9 +123,9 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
                 continue;
             }
 
-            if (value.length > MAX_SESSION_ID_LENGTH || !VALID_SESSION_CHARS.test(value)) {
+            if (value.length > this.config.maxSessionIdLength || !VALID_SESSION_CHARS.test(value)) {
                 add('malformed_session_id', 'cookie', name);
-            } else if (value.length < MIN_SESSION_ID_LENGTH || new Set(value).size < MIN_DISTINCT_CHARS) {
+            } else if (value.length < this.config.minSessionIdLength || new Set(value).size < this.config.minDistinctChars) {
                 add('weak_session_id', 'cookie', name);
             }
         }
@@ -145,11 +139,11 @@ export default class SessionFixation extends Tool<ToolContextType.Full> {
         }
     }
 
-    private static isSessionName(name: string): boolean {
+    private isSessionName(name: string): boolean {
         // "user[session_id]" and "auth.sid" are compared by their last segment
         const last = name.split(/[[\].]+/).filter(Boolean).pop() ?? '';
         const normalized = last.toLowerCase().replace(/[\s_.-]/g, '');
-        return SESSION_NAMES.has(normalized) || normalized.startsWith('aspsessionid');
+        return this.sessionNames.has(normalized) || normalized.startsWith('aspsessionid');
     }
 
     // Header-injection payloads are usually percent-encoded ("%0d%0aSet-Cookie:"), so decode before testing.

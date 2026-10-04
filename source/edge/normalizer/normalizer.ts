@@ -23,6 +23,8 @@ class Normalizer {
             fields,
             files: [],
             timestamp: Date.now(),
+            // rawHeaders keeps duplicates and original casing/order, which `headers` folds away
+            metadata: { rawHeaders: request.raw.rawHeaders, httpVersion: request.raw.httpVersion },
         };
     }
 

@@ -1,11 +1,5 @@
-import { RequestFile } from '@tessera/shared/contracts';
+import { RequestFile, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
-
-// hard-coded until we have enough infrastructure to support tool configuration
-const MAX_RATIO = 100; // uncompressed bytes per compressed byte
-const MIN_BYTES_FOR_RATIO = 1024 * 1024; // ignore the ratio below 1 MiB, tiny archives compress "badly" harmlessly
-const MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024; // 1 GiB, absolute cap regardless of ratio
-const MAX_ENTRIES = 10_000;
 
 // Hex prefixes of the file's first bytes. Tar has no prefix signature (its marker is at offset 257).
 const ARCHIVE_SIGNATURES = [
@@ -35,7 +29,7 @@ const ARCHIVE_CONTENT_TYPES = new Set([
 ]);
 
 export default class ArchiveExpansionRatio extends Tool<ToolContextType.File> {
-    constructor() {
+    constructor(private readonly config: ToolConfig<'archive_expansion_ratio'>) {
         super({
             id: 'archive_expansion_ratio',
             displayName: 'Archive expansion ratio',
@@ -62,15 +56,17 @@ export default class ArchiveExpansionRatio extends Tool<ToolContextType.File> {
         }
 
         const ratio = uncompressed / context.size;
+        const { maxUncompressedBytes, minBytesForRatio, maxRatio, maxEntries } = this.config;
         const reasons: string[] = [];
 
-        if (uncompressed > MAX_UNCOMPRESSED_BYTES) {
+        if (uncompressed > maxUncompressedBytes) {
             reasons.push('uncompressed_size_too_large');
         }
-        if (uncompressed >= MIN_BYTES_FOR_RATIO && ratio > MAX_RATIO) {
+        // below minBytesForRatio, tiny archives compress "badly" harmlessly
+        if (uncompressed >= minBytesForRatio && ratio > maxRatio) {
             reasons.push('ratio_too_high');
         }
-        if (ArchiveExpansionRatio.isNonNegativeNumber(entries) && entries > MAX_ENTRIES) {
+        if (ArchiveExpansionRatio.isNonNegativeNumber(entries) && entries > maxEntries) {
             reasons.push('too_many_entries');
         }
 

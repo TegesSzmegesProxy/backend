@@ -1,14 +1,5 @@
-import { NormalizedRequest } from '@tessera/shared/contracts';
+import { NormalizedRequest, ToolConfig } from '@tessera/shared/contracts';
 import { Tool, ToolCategory, ToolContextType, ToolResult } from '@tessera/core/static-analysis/shared';
-
-// hard-coded until we have enough infrastructure to support tool configuration
-// Asymmetric algorithms only. A symmetric algorithm next to a public key is the "algorithm confusion" attack.
-const ALLOWED_ALGORITHMS = new Set(['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512']);
-const ALLOWED_TYP = new Set(['jwt', 'at+jwt', 'jose']);
-const MAX_TOKEN_LENGTH = 4096;
-const MAX_HEADER_LENGTH = 1024; // base64url characters; real headers are usually under 200
-const MAX_KID_LENGTH = 256;
-const MAX_PBES2_ITERATIONS = 1_000_000;
 
 const BEARER = /^bearer +(\S+) *$/i;
 const BASE64URL = /^[A-Za-z0-9_-]+$/;
@@ -45,13 +36,19 @@ const KID_RULES: { name: string; pattern: RegExp }[] = [
 ];
 
 export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
-    constructor() {
+    // asymmetric algorithms by default: a symmetric algorithm next to a public key is the "algorithm confusion" attack
+    private readonly allowedAlgorithms: ReadonlySet<string>;
+    private readonly allowedTypes: ReadonlySet<string>;
+
+    constructor(private readonly config: ToolConfig<'jwt_header_abuse'>) {
         super({
             id: 'jwt_header_abuse',
             displayName: 'JWT header abuse',
             category: ToolCategory.Auth,
             contextType: ToolContextType.Full,
         });
+        this.allowedAlgorithms = new Set(config.allowedAlgorithms);
+        this.allowedTypes = new Set(config.allowedTypes);
     }
 
     override run(context: NormalizedRequest): ToolResult {
@@ -59,7 +56,7 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
         const token = typeof authorization === 'string' ? authorization.match(BEARER)?.[1] : undefined;
 
         // No bearer token, or one that is clearly not a JWS (3 segments) or JWE (5 segments): nothing to inspect.
-        if (!token || token.length > MAX_TOKEN_LENGTH) {
+        if (!token || token.length > this.config.maxTokenLength) {
             return JwtHeaderAbuse.safe(this.tool);
         }
 
@@ -68,7 +65,7 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
             return JwtHeaderAbuse.safe(this.tool);
         }
 
-        const { rules, alg } = JwtHeaderAbuse.analyze(parts[0]);
+        const { rules, alg } = this.analyze(parts[0]);
 
         if (rules.length > 0) {
             return {
@@ -83,10 +80,10 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
         return JwtHeaderAbuse.safe(this.tool);
     }
 
-    private static analyze(segment: string): { rules: string[]; alg?: string } {
+    private analyze(segment: string): { rules: string[]; alg?: string } {
         const rules = new Set<string>();
 
-        if (segment.length > MAX_HEADER_LENGTH) {
+        if (segment.length > this.config.maxHeaderLength) {
             rules.add('oversized_header');
         }
 
@@ -112,9 +109,11 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
             rules.add('invalid_alg');
         } else if (rawAlg.trim().toLowerCase() === 'none') {
             rules.add('alg_none');
+        } else if (this.allowedAlgorithms.has(rawAlg)) {
+            // configured, so expected
         } else if (/^hs\d{3}$/i.test(rawAlg)) {
             rules.add('symmetric_alg'); // HS256/384/512 where only public-key algorithms are accepted
-        } else if (!ALLOWED_ALGORITHMS.has(rawAlg)) {
+        } else {
             rules.add('unexpected_alg');
         }
 
@@ -131,12 +130,12 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
 
         // kid
         if (Object.prototype.hasOwnProperty.call(header, 'kid')) {
-            JwtHeaderAbuse.kidRules(header['kid']).forEach(rule => rules.add(rule));
+            this.kidRules(header['kid']).forEach(rule => rules.add(rule));
         }
 
         // typ
         const typ = header['typ'];
-        if (typ !== undefined && (typeof typ !== 'string' || !ALLOWED_TYP.has(typ.toLowerCase()))) {
+        if (typ !== undefined && (typeof typ !== 'string' || !this.allowedTypes.has(typ.toLowerCase()))) {
             rules.add('unexpected_typ');
         }
 
@@ -148,7 +147,7 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
 
         // PBES2 key derivation cost is attacker-controlled through "p2c"
         const p2c = header['p2c'];
-        if (p2c !== undefined && (typeof p2c !== 'number' || !Number.isInteger(p2c) || p2c < 1 || p2c > MAX_PBES2_ITERATIONS)) {
+        if (p2c !== undefined && (typeof p2c !== 'number' || !Number.isInteger(p2c) || p2c < 1 || p2c > this.config.maxPbes2Iterations)) {
             rules.add('pbes2_abuse');
         }
 
@@ -158,13 +157,13 @@ export default class JwtHeaderAbuse extends Tool<ToolContextType.Full> {
         return { rules: [...rules], alg };
     }
 
-    private static kidRules(kid: unknown): string[] {
+    private kidRules(kid: unknown): string[] {
         if (typeof kid !== 'string') {
             return ['invalid_kid'];
         }
 
         const rules: string[] = [];
-        if (kid.length > MAX_KID_LENGTH) {
+        if (kid.length > this.config.maxKidLength) {
             rules.push('kid_too_long');
         }
 

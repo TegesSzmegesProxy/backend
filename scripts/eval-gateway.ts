@@ -54,7 +54,7 @@ export async function startGateway(options: GatewayOptions): Promise<{ app: Fast
             const parsed = normalizer.normalize(request, EVAL_TENANT);
             const policy = fixture.endpoints[parsed.endpoint];
             const normalized = policy ? applyPolicy(parsed, policy) : parsed;
-            const verdict = aggregator.aggregate(runner.run(normalized, policy ? planFor(normalized, policy) : []));
+            const verdict = aggregator.aggregate(await runner.run(normalized, policy ? planFor(normalized, policy) : []));
             const decision = await orchestrator.orchestrate(normalized, verdict);
 
             reply.header('x-tessera-static', verdict.verdict);
