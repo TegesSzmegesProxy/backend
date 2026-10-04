@@ -1,0 +1,3 @@
+#!/bin/sh
+# Lets `tessera` run from PATH on Linux and macOS: add this directory to PATH. Follows symlinks to find tessera.js.
+exec node "$(dirname "$(readlink -f "$0")")/tessera.js" "$@"

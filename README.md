@@ -42,3 +42,30 @@ is needed. It never changes the active policy while handling requests. It also
 refreshes the organization JEV credential once per minute and sends a heartbeat
 and redacted minute counters to the dashboard. Request content and secrets are
 not included in telemetry.
+
+## Tessera CLI
+
+Put `cli/bin` on your PATH once, then run `tessera --install` to install every dependency (npm packages,
+nmap, nuclei, httpx, trivy, lynis, Redis, `.env`). After that `tessera --analyze-env`, `tessera project <tenant>`
+and the other options work from any directory. Replace the path below with where you cloned the repository.
+
+Linux (bash: use `~/.bashrc` instead of `~/.zshrc`):
+
+```sh
+echo 'export PATH="$HOME/Tessera/cli/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+```
+
+macOS (zsh is the default shell):
+
+```sh
+echo 'export PATH="$HOME/Tessera/cli/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
+```
+
+Windows (PowerShell; open a new terminal afterwards):
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\path\to\Tessera\cli\bin", "User")
+```
+
+Check it with `tessera --help`. `tessera --install` itself supports Linux (apt, dnf) and macOS (Homebrew); on
+Windows it installs the npm packages and the scanners must be installed by hand.

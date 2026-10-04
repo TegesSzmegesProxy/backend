@@ -7,6 +7,7 @@ import {
     EnvironmentInputError,
     type CommandResult,
     type CommandRunner,
+    type ToolProgress,
 } from '../../../source/core/environment-analysis';
 
 const fixture = (name: string) => readFileSync(join(__dirname, 'fixtures', name), 'utf8');
@@ -92,9 +93,16 @@ describe('EnvironmentAnalyzer', () => {
         expect(calls.find(c => c.binary === 'httpx')?.args.filter(a => a === '-u')).toHaveLength(1);
     });
 
-    it.each([['-oX/tmp/x'], ['host name'], ['http://'], ['']])('rejects target %j before running anything', async target => {
+    it.each([['-oX/tmp/x'], ['host name'], ['http://'], [''], ['http://user:secret@host/'], ['ftp://host'], ['host;rm -rf /']])('rejects target %j before running anything', async target => {
         const { runner, calls } = fakeRunner();
         await expect(new EnvironmentAnalyzer(runner).analyze({ ...input, targets: [target] })).rejects.toThrow(EnvironmentInputError);
+        expect(calls).toEqual([]);
+    });
+
+    it('rejects more targets than the limit', async () => {
+        const { runner, calls } = fakeRunner();
+        const targets = Array.from({ length: 51 }, (_, i) => `host${i}.example.com`);
+        await expect(new EnvironmentAnalyzer(runner).analyze({ ...input, targets })).rejects.toThrow(EnvironmentInputError);
         expect(calls).toEqual([]);
     });
 
@@ -114,6 +122,72 @@ describe('EnvironmentAnalyzer', () => {
         expect(timeout('nuclei')).toBe(900_000);
         expect(timeout('nmap')).toBe(5_000);
         expect(timeout('httpx')).toBe(2 * 60_000);
+    });
+
+    it('scopes nuclei to the detected stack and meaningful severities', async () => {
+        const { runner, calls } = fakeRunner();
+        await new EnvironmentAnalyzer(runner).analyze(input);
+        const nuclei = calls.find(c => c.binary === 'nuclei');
+        expect(nuclei?.args).toEqual(
+            expect.arrayContaining(['-automatic-scan', '-severity', 'medium,high,critical', '-exclude-tags', 'dos,intrusive,fuzz']),
+        );
+    });
+
+    it('records a tool that outlives its timeout as failed without delaying the others', async () => {
+        const { runner } = fakeRunner();
+        const slowNuclei: CommandRunner = {
+            run: (binary, args, options) =>
+                binary === 'nuclei'
+                    ? new Promise((_, reject) =>
+                          setTimeout(() => reject(new CommandError('timeout', 'nuclei timed out')), options.timeoutMs),
+                      )
+                    : runner.run(binary, args, options),
+        };
+        const started = Date.now();
+        const result = await new EnvironmentAnalyzer(slowNuclei, { privileged: false }).analyze({
+            ...input,
+            timeoutsMs: { nuclei: 1_000 },
+        });
+        expect(result.nuclei).toMatchObject({ status: 'failed', error: { kind: 'timeout' } });
+        expect(result.nmap.status).toBe('ok');
+        expect(result.lynis.status).toBe('ok');
+        expect(Date.now() - started).toBeLessThan(3_000);
+    });
+
+    it('runs the tools in parallel, not one after another', async () => {
+        const delayed = (stdout: string) => () => new Promise<CommandResult>(resolve => setTimeout(() => resolve(ok(stdout)), 300));
+        const { runner } = fakeRunner({
+            nmap: delayed(fixture('nmap.xml')),
+            nuclei: delayed(fixture('nuclei.jsonl')),
+            httpx: delayed(fixture('httpx.jsonl')),
+            trivy: delayed(fixture('trivy.json')),
+        });
+        const started = Date.now();
+        await new EnvironmentAnalyzer(runner, { privileged: false }).analyze(input);
+        expect(Date.now() - started).toBeLessThan(900);
+    });
+
+    it('reports when each tool starts and finishes', async () => {
+        const events: ToolProgress[] = [];
+        await new EnvironmentAnalyzer(fakeRunner().runner, { privileged: false }).analyze({
+            ...input,
+            disabled: ['lynis'],
+            onProgress: event => events.push(event),
+        });
+        const started = events.filter(e => e.phase === 'started').map(e => e.tool).sort();
+        expect(started).toEqual(['httpx', 'nmap', 'nuclei', 'trivy']);
+        const finished = Object.fromEntries(events.flatMap(e => (e.phase === 'finished' ? [[e.tool, e.status]] : [])));
+        expect(finished).toEqual({ nmap: 'ok', nuclei: 'ok', trivy: 'ok', httpx: 'ok', lynis: 'skipped' });
+    });
+
+    it('survives a progress listener that throws', async () => {
+        const result = await new EnvironmentAnalyzer(fakeRunner().runner, { privileged: false }).analyze({
+            ...input,
+            onProgress: () => {
+                throw new Error('boom');
+            },
+        });
+        expect(result.nmap.status).toBe('ok');
     });
 
     it('passes the nuclei rate limit only when given', async () => {

@@ -7,49 +7,59 @@ import { resolve } from "node:path";
 import { parseEnv } from "node:util";
 import { Command, InvalidArgumentError } from "commander";
 import {
+  InputError,
+  parseApiUrl,
+  parseDirectory,
+  parseOutputFile,
+  parsePort,
+  parseProjectId,
+  parseRateLimit,
+  parseTargetList,
+  parseTenant,
+} from "./inputs";
+import { runInstall } from "./install";
+import { createProgress } from "./progress";
+import { createPrompter } from "./prompt";
+import { loadExpectedDurations, saveDurations } from "./timings";
+import {
   EnvironmentAnalyzer,
   EnvironmentInputError,
   ExecFileRunner,
+  type EnvironmentTool,
 } from "../../source/core/environment-analysis";
 
 const repoRoot = resolve(__dirname, "..", "..");
 const bootstrapPath = resolve(repoRoot, "source", "bootstrap.ts");
 
-// Same format the environment analyzer accepts.
-const TENANT_ID = /^[A-Za-z0-9_-]{1,40}$/;
-
-function parseTenant(value: string): string {
-  if (!TENANT_ID.test(value)) {
-    throw new InvalidArgumentError("must be 1-40 characters of letters, digits, '_' or '-'");
-  }
-  return value;
+/** Adapts a validator to a commander option parser, which reports only InvalidArgumentError nicely. */
+function asArgument<T>(parse: (value: string) => T): (value: string) => T {
+  return (value) => {
+    try {
+      return parse(value);
+    } catch (error) {
+      if (error instanceof InputError) throw new InvalidArgumentError(error.message);
+      throw error;
+    }
+  };
 }
 
-// Mongo ObjectId of the project (tenant) in the control plane; it is the route tenant, unlike the proxy's TENANT_ID slug.
-const PROJECT_ID = /^[a-f0-9]{24}$/i;
-
-function parseProjectId(value: string): string {
-  if (!PROJECT_ID.test(value)) {
-    throw new InvalidArgumentError("must be the project's 24-character hex id");
-  }
-  return value;
-}
-
-function parseRateLimit(value: string): number {
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new InvalidArgumentError("must be a positive integer");
-  }
-  return parsed;
-}
-
-function collect(value: string, previous: string[]): string[] {
-  return [...previous, value];
+function collectTargets(value: string, previous: string[]): string[] {
+  return [...previous, ...asArgument(parseTargetList)(value)];
 }
 
 function fail(message: string): never {
   console.error(`Tessera: ${message}`);
   process.exit(1);
+}
+
+/** Runs a validator on a value that did not come through commander (environment, .env, defaults). */
+function checked<T>(source: string, parse: (value: string) => T, value: string): T {
+  try {
+    return parse(value);
+  } catch (error) {
+    if (error instanceof InputError) fail(`${source}: ${error.message}`);
+    throw error;
+  }
 }
 
 /** Starts the proxy for one tenant and mirrors the child's exit. */
@@ -73,8 +83,7 @@ function runTenant(tenantId: string): void {
   });
 }
 
-const TOOLS = ["nmap", "nuclei", "trivy", "httpx", "lynis"] as const;
-type Tool = (typeof TOOLS)[number];
+const TOOLS = ["nmap", "nuclei", "trivy", "httpx", "lynis"] as const satisfies readonly EnvironmentTool[];
 
 interface AnalyzeEnvOptions {
   tenant?: string;
@@ -107,37 +116,140 @@ function loadEnv(): Record<string, string | undefined> {
 
 const env = loadEnv();
 
-/** PORT and TENANT_ID as the proxy itself will see them. */
-function proxyEnv(): { port: string; tenant: string } {
-  return { port: env["PORT"] ?? "62197", tenant: env["TENANT_ID"] ?? "default" };
+/** Defaults from the proxy's own settings; checked only when used because they end up in a URL and in the report. */
+const defaultTenant = (): string => checked("TENANT_ID in the environment or .env", parseTenant, env["TENANT_ID"] ?? "default");
+const defaultTarget = (): string =>
+  `http://localhost:${checked("PORT in the environment or .env", parsePort, env["PORT"] ?? "62197")}`;
+
+interface Inputs {
+  tenantId: string;
+  targets: string[];
+  projectPath: string;
+}
+
+/** Asks for whatever was not given by flag, but only in a terminal; pipes and CI keep the defaults. */
+async function completeInputs(options: AnalyzeEnvOptions): Promise<Inputs> {
+  let tenantId = options.tenant ?? defaultTenant();
+  let targets = options.target.length > 0 ? options.target : [defaultTarget()];
+  let projectPath = options.projectPath ?? process.cwd();
+
+  const missing = options.tenant === undefined || options.target.length === 0 || options.projectPath === undefined;
+  // Prompts go to stderr and are answered on stdin, so both must be a terminal for anyone to see and answer them.
+  const interactive = Boolean(process.stdin.isTTY && process.stderr.isTTY);
+  if (missing && interactive) {
+    const prompter = createPrompter();
+    try {
+      if (options.tenant === undefined) {
+        tenantId = await prompter.ask("Tenant id", { default: tenantId, validate: parseTenant });
+      }
+      if (options.projectPath === undefined) {
+        projectPath = await prompter.ask("Project directory to scan (Trivy)", { default: projectPath, validate: parseDirectory });
+      }
+      if (options.target.length === 0) {
+        const answer = await prompter.ask("Target URL(s) to scan, comma separated", {
+          default: defaultTarget(),
+          validate: (value) => (parseTargetList(value), value),
+        });
+        targets = parseTargetList(answer);
+      }
+    } finally {
+      prompter.close();
+    }
+  }
+
+  return {
+    tenantId: checked("--tenant", parseTenant, tenantId),
+    targets: checked("--target", parseTargetList, targets.join(",")),
+    projectPath: checked("--project-path", parseDirectory, projectPath),
+  };
+}
+
+interface SendSettings {
+  apiUrl: string;
+  projectId: string;
+  apiKey: string;
+}
+
+/** What is missing to upload the report, so the user hears about it before a long analysis, not after. */
+function resolveSend(options: AnalyzeEnvOptions): { settings?: SendSettings; missing: string[] } {
+  // The key is read only from the environment or .env, never from an argument, so it stays out of shell history and `ps`.
+  const apiKey = env["TESSERA_API_KEY"]?.trim();
+  const missing: string[] = [];
+  if (!options.apiUrl) missing.push("--api-url (TESSERA_API_URL)");
+  if (!options.projectId) missing.push("--project-id (TESSERA_PROJECT_ID)");
+  if (!apiKey) missing.push("TESSERA_API_KEY in .env");
+  if (missing.length > 0 || !options.apiUrl || !options.projectId || !apiKey) return { missing };
+  return {
+    settings: {
+      // Values from the environment skip commander's parsers, so every one is checked here.
+      apiUrl: checked("--api-url / TESSERA_API_URL", parseApiUrl, options.apiUrl),
+      projectId: checked("--project-id / TESSERA_PROJECT_ID", parseProjectId, options.projectId),
+      apiKey,
+    },
+    missing,
+  };
 }
 
 async function analyzeEnvironment(options: AnalyzeEnvOptions): Promise<void> {
-  const defaults = proxyEnv();
-  const tenantId = options.tenant ?? defaults.tenant;
-  const targets = options.target.length > 0 ? options.target : [`http://localhost:${defaults.port}`];
+  // Cheap checks first: a mistake should cost the user seconds, not the length of the scan.
+  const outputFile = options.output === undefined ? undefined : checked("--output", parseOutputFile, options.output);
   const disabled = TOOLS.filter((tool) => options[`disable${tool[0]!.toUpperCase()}${tool.slice(1)}` as keyof AnalyzeEnvOptions]);
+  const enabled = TOOLS.filter((tool) => !disabled.includes(tool));
+  if (enabled.length === 0) fail("every tool is disabled; nothing to run");
+  const send = options.send ? resolveSend(options) : undefined;
+
+  const { tenantId, targets, projectPath } = await completeInputs(options);
+
+  if (send && !send.settings) {
+    console.error(`Tessera: the report will not be uploaded, missing ${send.missing.join(", ")} (use --no-send to silence this)`);
+  }
+  console.error(`Tessera: analyzing ${targets.join(", ")} as tenant ${tenantId}`);
+
+  const { expectedMs, learned } = loadExpectedDurations();
+  const progress = createProgress(enabled, process.stderr, {
+    expectedMs,
+    basis: enabled.every((tool) => learned.has(tool)) ? "previous runs" : "typical timings",
+  });
 
   const analyzer = new EnvironmentAnalyzer(new ExecFileRunner());
   try {
     const result = await analyzer.analyze({
       tenantId,
       targets,
-      projectPath: resolve(options.projectPath ?? process.cwd()),
+      projectPath,
       nucleiRateLimit: options.nucleiRateLimit,
       disabled,
+      onProgress: (event) => progress.update(event),
     });
+    progress.stop();
+
+    const completed: Partial<Record<EnvironmentTool, number>> = {};
+    for (const tool of TOOLS) {
+      const run = result[tool];
+      if (run.status === "ok") completed[tool] = run.durationMs;
+    }
+    saveDurations(completed);
+
     const json = JSON.stringify(result, null, 2);
     // stdout carries only the report so it can be piped; everything else goes to stderr.
     console.log(json);
-    if (options.output) {
-      writeFileSync(resolve(options.output), `${json}\n`);
-      console.error(`Tessera: report saved to ${resolve(options.output)}`);
-    }
-    if (options.send) await sendReport(options, json);
+    if (outputFile) saveReport(outputFile, json);
+    if (send?.settings) await sendReport(send.settings, json);
   } catch (error) {
+    progress.stop();
     if (error instanceof EnvironmentInputError) fail(error.message);
     throw error;
+  }
+}
+
+/** A failed save is reported but must not stop the upload: the analysis result is the expensive part. */
+function saveReport(file: string, json: string): void {
+  try {
+    writeFileSync(file, `${json}\n`);
+    console.error(`Tessera: report saved to ${file}`);
+  } catch (error) {
+    console.error(`Tessera: failed to save report to ${file}: ${error instanceof Error ? error.message : error}`);
+    process.exitCode = 1;
   }
 }
 
@@ -149,16 +261,7 @@ function snapshotsUrl(apiUrl: string, projectId: string): string {
 }
 
 /** Upload failure is reported but never discards the report that was already printed. */
-async function sendReport(options: AnalyzeEnvOptions, json: string): Promise<void> {
-  const { apiUrl, projectId } = options;
-  // The key is read only from the environment or .env, never from an argument, so it stays out of shell history and `ps`.
-  const apiKey = env["TESSERA_API_KEY"];
-  if (!apiUrl || !apiKey || !projectId) {
-    console.error(
-      "Tessera: report not sent; set TESSERA_API_KEY in .env and --api-url (TESSERA_API_URL) and --project-id (TESSERA_PROJECT_ID), or pass --no-send",
-    );
-    return;
-  }
+async function sendReport({ apiUrl, projectId, apiKey }: SendSettings, json: string): Promise<void> {
   const url = snapshotsUrl(apiUrl, projectId);
   try {
     const response = await fetch(url, {
@@ -197,21 +300,26 @@ const program = new Command();
 program
   .name("tessera")
   .description("Tessera runtime security proxy")
+  .option("--install", "install every dependency Tessera needs: npm packages, scanners, Redis, .env")
   .option("--analyze-env", "run the environment analyzer with every tool enabled")
-  .option("--tenant <id>", "tenant to analyze (default: TENANT_ID from source/.env)", parseTenant)
-  .option("--target <target>", "http(s) URL, hostname or IP to scan; repeatable (default: the local proxy)", collect, [] as string[])
-  .option("--project-path <path>", "project directory for the Trivy scan (default: current directory)")
-  .option("--nuclei-rate-limit <rps>", "nuclei requests per second", parseRateLimit)
-  .option("--output <file>", "also save the JSON report to this file")
-  .option("--api-url <url>", "control plane base URL, e.g. https://tessera.example.com (env: TESSERA_API_URL)", env["TESSERA_API_URL"])
-  .option("--project-id <id>", "control plane project id the report belongs to (env: TESSERA_PROJECT_ID)", parseProjectId, env["TESSERA_PROJECT_ID"])
+  .option("--tenant <id>", "tenant to analyze (default: TENANT_ID from source/.env)", asArgument(parseTenant))
+  .option("--target <target>", "http(s) URL, hostname or IP to scan; repeatable (default: the local proxy)", collectTargets, [] as string[])
+  .option("--project-path <path>", "project directory for the Trivy scan (default: current directory)", asArgument(parseDirectory))
+  .option("--nuclei-rate-limit <rps>", "nuclei requests per second, 1-1000", asArgument(parseRateLimit))
+  .option("--output <file>", "also save the JSON report to this file", asArgument(parseOutputFile))
+  .option("--api-url <url>", "control plane base URL, e.g. https://tessera.example.com (env: TESSERA_API_URL)", asArgument(parseApiUrl), env["TESSERA_API_URL"])
+  .option("--project-id <id>", "control plane project id the report belongs to (env: TESSERA_PROJECT_ID)", asArgument(parseProjectId), env["TESSERA_PROJECT_ID"])
   .option("--no-send", "do not send the report to the server");
 
 for (const tool of TOOLS) {
   program.option(`--disable-${tool}`, `skip ${tool} during --analyze-env`);
 }
 
-program.action(async (options: AnalyzeEnvOptions & { analyzeEnv?: boolean }) => {
+program.action(async (options: AnalyzeEnvOptions & { analyzeEnv?: boolean; install?: boolean }) => {
+  if (options.install) {
+    await runInstall(repoRoot);
+    return;
+  }
   if (!options.analyzeEnv) {
     program.help({ error: true });
   }
@@ -221,7 +329,7 @@ program.action(async (options: AnalyzeEnvOptions & { analyzeEnv?: boolean }) => 
 program
   .command("project")
   .description("run Tessera for the chosen tenant")
-  .argument("<tenant>", "tenant id", parseTenant)
+  .argument("<tenant>", "tenant id", asArgument(parseTenant))
   .action((tenant: string) => runTenant(tenant));
 
 program.parseAsync().catch((error) => {

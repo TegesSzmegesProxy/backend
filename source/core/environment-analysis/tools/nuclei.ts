@@ -26,6 +26,16 @@ export const nucleiArgs = (urls: string[], rateLimit?: number): string[] => [
     '-silent',
     '-no-color',
     '-disable-update-check',
+    // Scope the scan: templates for the detected stack only, no low-signal or risky ones, bounded requests.
+    '-automatic-scan',
+    '-severity',
+    'medium,high,critical',
+    '-exclude-tags',
+    'dos,intrusive,fuzz',
+    '-timeout',
+    '5',
+    '-concurrency',
+    '25',
     ...(rateLimit !== undefined ? ['-rl', String(rateLimit)] : []),
 ];
 

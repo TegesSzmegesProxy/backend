@@ -28,7 +28,13 @@ export interface EnvironmentAnalysisInput {
     timeoutsMs?: Partial<Record<EnvironmentTool, number>>;
     /** Nuclei requests per second (`-rl`); nuclei's own default applies when omitted. */
     nucleiRateLimit?: number;
+    /** Called when a tool starts and when it ends (ok, failed or skipped); never throws into the analysis. */
+    onProgress?: (event: ToolProgress) => void;
 }
+
+export type ToolProgress =
+    | { tool: EnvironmentTool; phase: 'started' }
+    | { tool: EnvironmentTool; phase: 'finished'; status: 'ok' | 'failed' | 'skipped'; durationMs: number };
 
 export type ToolFailureKind = 'missing' | 'timeout' | 'exit' | 'parse';
 

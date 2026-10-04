@@ -12,6 +12,7 @@ import type {
     EnvironmentAnalysisInput,
     EnvironmentAnalysisResult,
     EnvironmentTool,
+    ToolProgress,
     ToolRun,
 } from './types';
 
@@ -41,11 +42,12 @@ const DEFAULT_TIMEOUTS_MS: Record<EnvironmentTool, number> = {
 
 const MIN_TIMEOUT_MS = 1_000;
 const MAX_TIMEOUT_MS = 2 * 60 * 60_000;
-const MAX_RATE_LIMIT = 1_000;
+export const MAX_RATE_LIMIT = 1_000;
+export const MAX_TARGETS = 50;
 const TENANT_ID = /^[A-Za-z0-9_-]{1,40}$/;
 const HOSTNAME = /^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/;
 
-interface Targets {
+export interface Targets {
     /** Full URLs or bare hosts for the HTTP scanners. */
     urls: string[];
     /** Deduplicated hosts for nmap. */
@@ -92,16 +94,18 @@ export class EnvironmentAnalyzer {
         const disabled = new Set(input.disabled ?? []);
         const skip = (tool: EnvironmentTool, reason: string | undefined) => (disabled.has(tool) ? 'disabled' : reason);
         const noTargets = targets.urls.length === 0 ? 'no targets given' : undefined;
+        const track = <T>(tool: EnvironmentTool, skipReason: string | undefined, run: () => Promise<T>) =>
+            this.track(tool, skipReason, run, input.onProgress);
         const [nmap, nuclei, trivy, httpx, lynis] = await Promise.all([
-            this.track('nmap', skip('nmap', noTargets), async () => parseNmap(await this.exec('nmap', nmapArgs(targets.hosts), timeoutsMs.nmap))),
-            this.track('nuclei', skip('nuclei', noTargets), async () => parseNuclei(await this.exec('nuclei', nucleiArgs(targets.urls, rateLimit), timeoutsMs.nuclei))),
-            this.track(
+            track('nmap', skip('nmap', noTargets), async () => parseNmap(await this.exec('nmap', nmapArgs(targets.hosts), timeoutsMs.nmap))),
+            track('nuclei', skip('nuclei', noTargets), async () => parseNuclei(await this.exec('nuclei', nucleiArgs(targets.urls, rateLimit), timeoutsMs.nuclei))),
+            track(
                 'trivy',
                 skip('trivy', input.projectPath === undefined ? 'no projectPath given' : undefined),
                 async () => parseTrivy(await this.exec('trivy', trivyArgs(input.projectPath as string), timeoutsMs.trivy))
             ),
-            this.track('httpx', skip('httpx', noTargets), async () => parseHttpx(await this.exec('httpx', httpxArgs(targets.urls), timeoutsMs.httpx))),
-            this.track('lynis', skip('lynis', undefined), () => this.runLynis(timeoutsMs.lynis)),
+            track('httpx', skip('httpx', noTargets), async () => parseHttpx(await this.exec('httpx', httpxArgs(targets.urls), timeoutsMs.httpx))),
+            track('lynis', skip('lynis', undefined), () => this.runLynis(timeoutsMs.lynis)),
         ]);
 
         return { tenantId: input.tenantId, startedAt, completedAt: new Date().toISOString(), nmap, nuclei, trivy, httpx, lynis };
@@ -140,17 +144,35 @@ export class EnvironmentAnalyzer {
     }
 
     /** Runs one tool and converts every outcome, including a throw, into a ToolRun. Never rejects. */
-    private async track<T>(tool: EnvironmentTool, skipReason: string | undefined, run: () => Promise<T>): Promise<ToolRun<T>> {
+    private async track<T>(
+        tool: EnvironmentTool,
+        skipReason: string | undefined,
+        run: () => Promise<T>,
+        onProgress?: (event: ToolProgress) => void
+    ): Promise<ToolRun<T>> {
         const started = Date.now();
         const base = () => ({ tool, startedAt: new Date(started).toISOString(), durationMs: Date.now() - started });
-        if (skipReason !== undefined) return { ...base(), status: 'skipped', reason: skipReason };
+        // A broken progress listener must not break the analysis.
+        const notify = (event: ToolProgress) => {
+            try {
+                onProgress?.(event);
+            } catch {
+                /* ignored */
+            }
+        };
+        const finish = (result: ToolRun<T>): ToolRun<T> => {
+            notify({ tool, phase: 'finished', status: result.status, durationMs: result.durationMs });
+            return result;
+        };
+        if (skipReason !== undefined) return finish({ ...base(), status: 'skipped', reason: skipReason });
+        notify({ tool, phase: 'started' });
         try {
             const result = await run();
-            return { ...base(), status: 'ok', result };
+            return finish({ ...base(), status: 'ok', result });
         } catch (error) {
             const kind = error instanceof CommandError ? error.kind : 'parse';
             const message = error instanceof Error ? error.message : String(error);
-            return { ...base(), status: 'failed', error: { kind, message } };
+            return finish({ ...base(), status: 'failed', error: { kind, message } });
         }
     }
 }
@@ -159,7 +181,9 @@ function isIntegerInRange(value: number, min: number, max: number): boolean {
     return Number.isInteger(value) && value >= min && value <= max;
 }
 
-function parseTargets(targets: string[]): Targets {
+/** Validates targets and splits them into URLs for the HTTP scanners and hosts for nmap. */
+export function parseTargets(targets: string[]): Targets {
+    if (targets.length > MAX_TARGETS) throw new EnvironmentInputError(`at most ${MAX_TARGETS} targets are allowed`);
     const urls = new Set<string>();
     const hosts = new Set<string>();
     for (const target of targets) {
@@ -170,6 +194,8 @@ function parseTargets(targets: string[]): Targets {
             } catch {
                 throw new EnvironmentInputError(`invalid target URL: ${target}`);
             }
+            // Arguments are visible in the process list, so a password must never ride along in a target.
+            if (url.username || url.password) throw new EnvironmentInputError('target URLs must not contain credentials');
             urls.add(url.href);
             hosts.add(url.hostname.replace(/^\[|\]$/g, ''));
         } else if (isIP(target) !== 0 || HOSTNAME.test(target)) {
