@@ -61,11 +61,9 @@ macOS (zsh is the default shell):
 echo 'export PATH="$HOME/Tessera/cli/bin:$PATH"' >> ~/.zshrc && source ~/.zshrc
 ```
 
-Windows (PowerShell; open a new terminal afterwards):
+Windows:
 
-```powershell
-[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path", "User") + ";C:\path\to\Tessera\cli\bin", "User")
-```
+Add `cli\bin` to your user `Path` in Environment Varibles and open a new terminal.
 
 Check it with `tessera --help`. `tessera --install` itself supports Linux (apt, dnf) and macOS (Homebrew); on
 Windows it installs the npm packages and the scanners must be installed by hand.
